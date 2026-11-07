@@ -1,0 +1,8 @@
+.git
+.idea
+.maven-home
+.env
+.env.*
+target
+*.iml
+**/__pycache__
