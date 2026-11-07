@@ -1,166 +1,75 @@
 # ViVuViet Backend
 
-Backend đặt xe liên tỉnh, sử dụng Java 17, Spring Boot, Spring Security và PostgreSQL.
+Backend cho web đặt vé xe liên tỉnh của nhóm. Project dùng Java 17, Spring Boot và PostgreSQL.
 
-## Chạy nhanh bằng Docker Compose
+## Chạy project
 
-Cài Docker Desktop và bật Linux containers (hoặc Docker Engine cùng Compose trên Linux). Clone nhánh `main`, sau đó chạy Compose:
+Máy cần có Git và Docker. Nếu dùng Windows, mở Docker Desktop và chọn Linux containers trước khi chạy.
 
-```powershell
+```bash
 git clone --branch main https://github.com/vuhoangduong3/ViVuViet-backend.git
 cd ViVuViet-backend
 docker compose up -d --build
 ```
 
-Lần đầu cần Internet để tải base image và dependency. Compose build từ source hiện tại; chưa cần image trên Docker Hub/GHCR. Backend và PostgreSQL chạy chung trong **một container**. Không cần cài Java, Maven, PostgreSQL riêng hoặc tạo `.env`. Docker tự tạo database và sinh mật khẩu/JWT secret, lưu cùng dữ liệu trong volume `app-data`. Nhánh `main` đã tích hợp code xác thực, tuyến/chuyến và cấu hình Docker.
+Lần đầu sẽ mất vài phút để tải các thành phần cần thiết và build source. Java, backend và PostgreSQL đều được đóng gói sẵn trong cấu hình Docker, nên không cần cài thêm Java, Maven hay PostgreSQL trên máy. Cũng không cần tạo file `.env`: mật khẩu database và khóa JWT được sinh tự động ở lần chạy đầu.
 
-Xem tiến trình khởi động và trạng thái:
+Để xem ứng dụng đã lên chưa:
 
-```powershell
-docker compose logs -f app
+```bash
 docker compose ps
+docker compose logs -f app
 ```
 
-Khi container báo `healthy`, mở Swagger tại <http://localhost:8080/swagger-ui.html>. Database mới chưa có dữ liệu hãng xe, địa điểm, tuyến/chuyến hay tài khoản admin; dùng Swagger để đăng ký khách hàng. Các hướng dẫn chuẩn bị dữ liệu ở phần dưới vẫn áp dụng.
+Khi trạng thái chuyển sang `healthy`, mở [Swagger](http://localhost:8080/swagger-ui.html) để thử API. Nhấn `Ctrl+C` để thoát màn hình log; container vẫn tiếp tục chạy.
 
-Các lệnh quản lý:
+Nếu đã có source trên máy, cập nhật rồi build lại:
 
-```powershell
-# Dừng và gỡ container, giữ dữ liệu trong volume
-docker compose down
-
-# Chạy lại với dữ liệu cũ
-docker compose up -d
-
-# Build lại sau khi sửa source
+```bash
+git switch main
+git pull --ff-only
 docker compose up -d --build
 ```
 
-`docker compose down -v` sẽ xóa cả volume, database và secret đã sinh; chỉ dùng khi muốn xóa toàn bộ dữ liệu Docker của project. Database trên máy ở cổng 5433 không bị sử dụng hay thay đổi. Chỉ cổng HTTP 8080 được publish, PostgreSQL bên trong không mở ra máy host.
+## Dừng và chạy lại
 
-Nếu cổng 8080 đã có ứng dụng dùng, đổi cổng host trong PowerShell:
+```bash
+# Dừng project, giữ lại dữ liệu
+docker compose down
+
+# Chạy lại
+docker compose up -d
+```
+
+Database được lưu trong volume `app-data`, nên tài khoản và dữ liệu vẫn còn khi tạo lại container. Lệnh `docker compose down -v` sẽ xóa cả dữ liệu này, chỉ dùng khi muốn làm lại từ đầu.
+
+PostgreSQL chạy bên trong container, không dùng database đang có trên máy. Compose chỉ mở cổng `8080` cho backend.
+
+Nếu cổng 8080 đang bận, đổi sang 8081 trong PowerShell:
 
 ```powershell
 $env:APP_PORT = "8081"
 docker compose up -d
 ```
 
-Sau đó mở Swagger bằng cổng 8081. Các phần tiếp theo hướng dẫn chạy trực tiếp trên máy khi không dùng Docker.
+Sau đó mở [Swagger ở cổng 8081](http://localhost:8081/swagger-ui.html).
 
-## 1. Chọn nhánh
+## Các chức năng hiện có
 
-| Nhánh | Nội dung |
+`main` đã có code của cả hai phần Sprint 1:
+
+| Phần | Chức năng |
 | --- | --- |
-| `main` | Bản tích hợp: codebase, xác thực, tuyến/chuyến và Docker Compose |
-| `feature/1.7-auth` | Codebase và API đăng ký, đăng nhập, JWT, phân quyền theo hãng xe |
-| `feature/1.8-routes-trips` | Kế thừa nhánh 1.7, bổ sung API địa điểm, điểm dừng, tuyến, chuyến và tìm kiếm |
+| 1.7 | Đăng ký, đăng nhập, làm mới token, đăng xuất và phân quyền theo hãng xe |
+| 1.8 | Danh sách địa điểm, quản lý điểm đón/trả, tuyến đường, chuyến xe, mở bán và tìm kiếm chuyến |
 
-Để chạy bản tích hợp hiện có, clone nhánh `main`:
+Hai nhánh `feature/1.7-auth` và `feature/1.8-routes-trips` lưu phần công việc tương ứng. Để chạy bản đầy đủ bằng Docker Compose, dùng `main` theo hướng dẫn ở trên.
 
-```powershell
-git clone --branch main https://github.com/vuhoangduong3/ViVuViet-backend.git
-cd ViVuViet-backend
-```
+Database tạo mới chưa có hãng xe, địa điểm, tuyến, chuyến hay tài khoản admin. Vì vậy, API danh sách trả về rỗng là bình thường.
 
-Nếu đã clone repository, chuyển nhánh trong thư mục project:
+## Thử đăng nhập trên Swagger
 
-```powershell
-git switch main
-git pull --ff-only
-```
-
-## 2. Chuẩn bị môi trường
-
-- Cài JDK 17 và thiết lập `JAVA_HOME` trỏ tới thư mục JDK.
-- Cài Git.
-- Có PostgreSQL đang chạy và tài khoản được phép tạo/cập nhật bảng trong database của project.
-- Có Internet ở lần chạy đầu để Maven Wrapper tải Maven và các dependency.
-
-Kiểm tra trong PowerShell:
-
-```powershell
-java -version
-git --version
-.\mvnw.cmd -v
-```
-
-Project có Maven Wrapper nên không cần cài Maven riêng. Phiên bản Spring Boot và dependency được khai báo trong `pom.xml`; phiên bản Maven được cấu hình trong `.mvn/wrapper/maven-wrapper.properties`.
-
-## 3. Chuẩn bị PostgreSQL
-
-Cấu hình mặc định trong `src/main/resources/application.properties` kết nối tới:
-
-```text
-Host: localhost
-Port: 5433
-Database: project
-```
-
-Nếu database `project` chưa tồn tại, mở pgAdmin hoặc psql, kết nối bằng tài khoản có quyền tạo database và chạy:
-
-```sql
-CREATE DATABASE project;
-```
-
-Tài khoản ứng dụng phải có quyền kết nối và tạo bảng trong database này. Nếu database đã có sẵn thì dùng database đó, không cần tạo lại.
-
-## 4. Tạo file .env
-
-Tạo file tên `.env` ngay cạnh `pom.xml`, với nội dung sau và thay các giá trị mẫu bằng cấu hình trên máy:
-
-```properties
-DB_USERNAME=your_database_user
-DB_PASSWORD=your_database_password
-AUTH_JWT_SECRET=replace-with-your-own-random-secret-at-least-32-characters
-```
-
-`AUTH_JWT_SECRET` phải có ít nhất 32 ký tự. Có thể tạo một chuỗi ngẫu nhiên bằng PowerShell rồi chép kết quả vào file `.env`:
-
-```powershell
-$jwtBytes = New-Object byte[] 32
-$jwtRng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
-$jwtRng.GetBytes($jwtBytes)
-$jwtRng.Dispose()
-[Convert]::ToBase64String($jwtBytes)
-```
-
-File này được Spring đọc theo định dạng Java properties: dùng `KEY=value`, không thêm `export` và không bọc giá trị trong dấu nháy như file shell. Không commit file `.env` chứa thông tin thật.
-
-Nếu PostgreSQL chạy ở cổng khác, ví dụ `5432`, hoặc dùng database khác, thêm dòng ghi đè vào `.env`:
-
-```properties
-spring.datasource.url=jdbc:postgresql://localhost:5432/your_database
-```
-
-Project hiện dùng `spring.jpa.hibernate.ddl-auto=update`: Hibernate tạo/cập nhật bảng theo entity khi khởi động. Database phải tồn tại trước; cấu hình này không tự tạo database. Nội dung `DATABASE_DESIGN.md` là tài liệu thiết kế, không phải script khởi tạo SQL.
-
-## 5. Chạy backend
-
-Chạy tại thư mục chứa `pom.xml` để ứng dụng đọc đúng file `.env`:
-
-```powershell
-.\mvnw.cmd spring-boot:run
-```
-
-Trên Linux/macOS:
-
-```bash
-sh ./mvnw spring-boot:run
-```
-
-Khi log xuất hiện thông báo `Started ViVuVietApplication`, truy cập:
-
-- Swagger UI: <http://localhost:8080/swagger-ui.html>
-- OpenAPI JSON: <http://localhost:8080/v3/api-docs>
-- API lấy địa điểm: <http://localhost:8080/api/v1/areas> (nhánh 1.8).
-
-Nhấn `Ctrl+C` tại terminal để dừng backend. Project hiện chưa có dependency Actuator nên chưa cung cấp `/actuator/health`.
-
-## 6. Thử API trên Swagger
-
-Các bước dưới đây áp dụng cho nhánh 1.7 và 1.8. Request xác thực được bọc trong trường `wsRequest`.
-
-1. Mở Swagger, chọn `POST /api/v1/auth/register`, bấm **Try it out**, nhập:
+Mở `POST /api/v1/auth/register`, chọn **Try it out** và nhập:
 
 ```json
 {
@@ -173,7 +82,7 @@ Các bước dưới đây áp dụng cho nhánh 1.7 và 1.8. Request xác thự
 }
 ```
 
-2. Gọi `POST /api/v1/auth/login`:
+Sau khi đăng ký thành công, gọi `POST /api/v1/auth/login`:
 
 ```json
 {
@@ -184,46 +93,25 @@ Các bước dưới đây áp dụng cho nhánh 1.7 và 1.8. Request xác thự
 }
 ```
 
-3. Lấy access token từ dữ liệu trả về, bấm **Authorize** trên Swagger và dán token vào ô `bearerAuth`.
-4. Gọi `GET /api/v1/me` để xem tài khoản hiện tại.
+Chép `wsResponse.accessToken` trong kết quả trả về, bấm **Authorize** trên Swagger rồi dán token vào ô `bearerAuth`. Có thể gọi `GET /api/v1/me` để kiểm tra tài khoản vừa đăng nhập.
 
-Đăng ký chỉ tạo tài khoản khách hàng. API quản trị tuyến/chuyến yêu cầu tài khoản có membership và vai trò `COMPANY_ADMIN` của đúng hãng xe. Project chưa cung cấp API tạo admin hãng; cần chuẩn bị dữ liệu hãng, membership và vai trò trước khi thử các API quản trị.
+Tài khoản đăng ký mới là khách hàng. Muốn thử các API quản lý tuyến/chuyến của mục 1.8, cần có dữ liệu hãng xe và gán tài khoản làm thành viên với vai trò `COMPANY_ADMIN` tại hãng đó. Hiện chưa có API tạo admin hãng, nên phần dữ liệu này cần được chuẩn bị trong database.
 
-Database mới chưa có dữ liệu địa điểm, tuyến hoặc chuyến nên API danh sách có thể trả kết quả rỗng. Khách chỉ tìm thấy chuyến đáp ứng điều kiện tìm kiếm và đã được mở bán.
+Với mục 1.8, admin tạo điểm dừng, tuyến và lịch trình trước, sau đó tạo chuyến và mở bán. Khách có thể dùng API tìm kiếm để xem các chuyến đã mở bán phù hợp với nơi đi, nơi đến và ngày đi.
 
-## 7. Build và chạy kiểm thử
+## Khi gặp lỗi
 
-Build JAR, đồng thời chạy test:
+- Docker không kết nối được: kiểm tra Docker Desktop đã mở và Linux engine đang chạy.
+- Build bị lỗi tải image hoặc dependency: kiểm tra kết nối mạng, xem log rồi chạy lại `docker compose up -d --build`.
+- Container chưa `healthy`: xem `docker compose logs --tail 100 app` để biết lỗi cụ thể.
+- API trả `401`: đăng nhập lại và cập nhật access token trong Swagger.
+- API quản trị trả `403`: kiểm tra quyền `COMPANY_ADMIN` của tài khoản trong đúng hãng xe.
 
-```powershell
-.\mvnw.cmd clean package
-java -jar .\target\Vi-vu-Viet-0.0.1-SNAPSHOT.jar
-```
+## Các file liên quan
 
-Chỉ chạy test:
+- `compose.yaml`: cấu hình chạy project và volume dữ liệu.
+- `Dockerfile`: build backend và đóng gói cùng PostgreSQL.
+- `docker/start.sh`: chuẩn bị database, mật khẩu, khóa JWT và khởi động ứng dụng.
+- `DATABASE_DESIGN.md`: tài liệu thiết kế database.
 
-```powershell
-.\mvnw.cmd test
-```
-
-Test hiện tại là `@SpringBootTest`, khởi động Spring context nên cần cấu hình `.env` và PostgreSQL sẵn sàng. Khi chạy JAR cũng cần đứng tại thư mục project để đọc `.env`.
-
-## 8. Lỗi thường gặp
-
-| Hiện tượng | Cách kiểm tra |
-| --- | --- |
-| Không tìm thấy Java hoặc `JAVA_HOME` không hợp lệ | Kiểm tra JDK 17, `JAVA_HOME` và kết quả `.\mvnw.cmd -v` |
-| Không tải được Maven/dependency | Kiểm tra Internet, proxy và URL tải trong cấu hình Wrapper hoặc `pom.xml` |
-| `Connection refused` | Kiểm tra PostgreSQL đang chạy, host và cổng `5433`/`5432` |
-| `database ... does not exist` | Tạo database hoặc sửa `spring.datasource.url` trong `.env` |
-| `password authentication failed` | Kiểm tra `DB_USERNAME` và `DB_PASSWORD` |
-| `permission denied for schema` | Cấp quyền dùng schema và tạo bảng cho tài khoản ứng dụng |
-| Không resolve được biến môi trường | Kiểm tra tên file `.env`, tên biến và thư mục đang chạy lệnh |
-| JWT secret quá ngắn | Đặt `AUTH_JWT_SECRET` có ít nhất 32 ký tự |
-| Cổng 8080 đang được sử dụng | Dừng ứng dụng cũ hoặc thêm `server.port=8081` vào `.env`, rồi dùng URL với cổng mới |
-| API trả `401` | Đăng nhập lại và gửi access token hợp lệ |
-| API quản trị trả `403` | Kiểm tra membership và quyền `COMPANY_ADMIN` trong đúng hãng xe |
-
-## 9. File không đưa lên Git
-
-`.env`, `target/`, `.idea/` và `.maven-home/` là file/thư mục cục bộ, đã được loại trừ trong `.gitignore`.
+Nếu cần chạy trực tiếp bằng IntelliJ hoặc Maven để debug, vẫn phải tự chuẩn bị JDK 17, PostgreSQL và các biến `DB_USERNAME`, `DB_PASSWORD`, `AUTH_JWT_SECRET`. Cấu hình kết nối mặc định nằm trong `src/main/resources/application.properties`.
