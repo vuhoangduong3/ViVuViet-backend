@@ -1,0 +1,18 @@
+name: vivuviet
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: vivuviet-backend:local
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    volumes:
+      - app-data:/var/lib/vivuviet
+    restart: unless-stopped
+    stop_grace_period: 40s
+    mem_limit: 1g
+
+volumes:
+  app-data:

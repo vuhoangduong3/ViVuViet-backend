@@ -2,25 +2,70 @@
 
 Backend đặt xe liên tỉnh, sử dụng Java 17, Spring Boot, Spring Security và PostgreSQL.
 
+## Chạy nhanh bằng Docker Compose
+
+Cài Docker Desktop và bật Linux containers (hoặc Docker Engine cùng Compose trên Linux). Clone nhánh `main`, sau đó chạy Compose:
+
+```powershell
+git clone --branch main https://github.com/vuhoangduong3/ViVuViet-backend.git
+cd ViVuViet-backend
+docker compose up -d --build
+```
+
+Lần đầu cần Internet để tải base image và dependency. Compose build từ source hiện tại; chưa cần image trên Docker Hub/GHCR. Backend và PostgreSQL chạy chung trong **một container**. Không cần cài Java, Maven, PostgreSQL riêng hoặc tạo `.env`. Docker tự tạo database và sinh mật khẩu/JWT secret, lưu cùng dữ liệu trong volume `app-data`. Nhánh `main` đã tích hợp code xác thực, tuyến/chuyến và cấu hình Docker.
+
+Xem tiến trình khởi động và trạng thái:
+
+```powershell
+docker compose logs -f app
+docker compose ps
+```
+
+Khi container báo `healthy`, mở Swagger tại <http://localhost:8080/swagger-ui.html>. Database mới chưa có dữ liệu hãng xe, địa điểm, tuyến/chuyến hay tài khoản admin; dùng Swagger để đăng ký khách hàng. Các hướng dẫn chuẩn bị dữ liệu ở phần dưới vẫn áp dụng.
+
+Các lệnh quản lý:
+
+```powershell
+# Dừng và gỡ container, giữ dữ liệu trong volume
+docker compose down
+
+# Chạy lại với dữ liệu cũ
+docker compose up -d
+
+# Build lại sau khi sửa source
+docker compose up -d --build
+```
+
+`docker compose down -v` sẽ xóa cả volume, database và secret đã sinh; chỉ dùng khi muốn xóa toàn bộ dữ liệu Docker của project. Database trên máy ở cổng 5433 không bị sử dụng hay thay đổi. Chỉ cổng HTTP 8080 được publish, PostgreSQL bên trong không mở ra máy host.
+
+Nếu cổng 8080 đã có ứng dụng dùng, đổi cổng host trong PowerShell:
+
+```powershell
+$env:APP_PORT = "8081"
+docker compose up -d
+```
+
+Sau đó mở Swagger bằng cổng 8081. Các phần tiếp theo hướng dẫn chạy trực tiếp trên máy khi không dùng Docker.
+
 ## 1. Chọn nhánh
 
 | Nhánh | Nội dung |
 | --- | --- |
-| `main` | Codebase nền và các lớp dùng chung |
+| `main` | Bản tích hợp: codebase, xác thực, tuyến/chuyến và Docker Compose |
 | `feature/1.7-auth` | Codebase và API đăng ký, đăng nhập, JWT, phân quyền theo hãng xe |
 | `feature/1.8-routes-trips` | Kế thừa nhánh 1.7, bổ sung API địa điểm, điểm dừng, tuyến, chuyến và tìm kiếm |
 
-Để chạy đầy đủ các chức năng hiện có, clone nhánh 1.8:
+Để chạy bản tích hợp hiện có, clone nhánh `main`:
 
 ```powershell
-git clone --branch feature/1.8-routes-trips https://github.com/vuhoangduong3/ViVuViet-backend.git
+git clone --branch main https://github.com/vuhoangduong3/ViVuViet-backend.git
 cd ViVuViet-backend
 ```
 
 Nếu đã clone repository, chuyển nhánh trong thư mục project:
 
 ```powershell
-git switch feature/1.8-routes-trips
+git switch main
 git pull --ff-only
 ```
 
