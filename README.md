@@ -12,7 +12,9 @@ cd ViVuViet-backend
 docker compose up -d --build
 ```
 
-Lần đầu sẽ mất vài phút để tải các thành phần cần thiết và build source. Java, backend và PostgreSQL đều được đóng gói sẵn trong cấu hình Docker, nên không cần cài thêm Java, Maven hay PostgreSQL trên máy. Cũng không cần tạo file `.env`: mật khẩu database và khóa JWT được sinh tự động ở lần chạy đầu.
+Lần đầu sẽ mất vài phút để tải các thành phần cần thiết và build source. Java, backend và PostgreSQL đều chạy trong Docker, nên không cần cài thêm Java, Maven hay PostgreSQL trên máy. Compose tạo hai service riêng: `app` cho backend và `db` cho PostgreSQL.
+
+Để chỉnh cấu hình, sao chép `.env.example` thành `.env` rồi sửa các giá trị. Có thể bỏ qua bước này nếu dùng cấu hình mặc định. File `.env` được Git bỏ qua.
 
 Để xem ứng dụng đã lên chưa:
 
@@ -41,9 +43,15 @@ docker compose down
 docker compose up -d
 ```
 
-Database được lưu trong volume `app-data`, nên tài khoản và dữ liệu vẫn còn khi tạo lại container. Lệnh `docker compose down -v` sẽ xóa cả dữ liệu này, chỉ dùng khi muốn làm lại từ đầu.
+Database được lưu trong Docker volume `vivuviet_db-data`, nên dữ liệu vẫn còn khi tạo lại container. Lệnh `docker compose down -v` sẽ xóa cả dữ liệu này, chỉ dùng khi muốn làm lại từ đầu.
 
-PostgreSQL chạy bên trong container, không dùng database đang có trên máy. Compose chỉ mở cổng `8080` cho backend.
+PostgreSQL có thể được chỉnh sửa từ máy host bằng `psql`, pgAdmin, DBeaver hoặc công cụ tương tự. Kết nối mặc định là `localhost:5433`, database `project`, username `vivuviet`, password `vivuviet_dev_password`. Đây là thông tin dùng cho phát triển cục bộ.
+
+```bash
+psql -h localhost -p 5433 -U vivuviet -d project
+```
+
+Có thể đổi `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`, `DB_PORT`, `APP_PORT` và `AUTH_JWT_SECRET` trong `.env`. PostgreSQL chỉ dùng `DB_NAME`, `DB_USERNAME` và `DB_PASSWORD` khi khởi tạo volume lần đầu. Nếu volume đã có dữ liệu, cần đổi tài khoản trực tiếp trong PostgreSQL hoặc xóa volume bằng `docker compose down -v` (lệnh này xóa database).
 
 Nếu cổng 8080 đang bận, đổi sang 8081 trong PowerShell:
 
@@ -110,8 +118,7 @@ Với mục 1.8, admin tạo điểm dừng, tuyến và lịch trình trước,
 ## Các file liên quan
 
 - `compose.yaml`: cấu hình chạy project và volume dữ liệu.
-- `Dockerfile`: build backend và đóng gói cùng PostgreSQL.
-- `docker/start.sh`: chuẩn bị database, mật khẩu, khóa JWT và khởi động ứng dụng.
+- `Dockerfile`: build image cho backend.
 - `DATABASE_DESIGN.md`: tài liệu thiết kế database.
 
 Nếu cần chạy trực tiếp bằng IntelliJ hoặc Maven để debug, vẫn phải tự chuẩn bị JDK 17, PostgreSQL và các biến `DB_USERNAME`, `DB_PASSWORD`, `AUTH_JWT_SECRET`. Cấu hình kết nối mặc định nằm trong `src/main/resources/application.properties`.

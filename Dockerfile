@@ -5,20 +5,18 @@ COPY pom.xml ./
 COPY src ./src
 RUN mvn -B -DskipTests package
 
-FROM postgres:16-bookworm
+FROM eclipse-temurin:17-jre
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends openjdk-17-jre-headless curl tini \
+    && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 10001 --no-create-home app
 WORKDIR /app
 COPY --from=build /build/target/Vi-vu-Viet-0.0.1-SNAPSHOT.jar /app/app.jar
-COPY docker/start.sh docker/healthcheck.sh /app/
-RUN sed -i 's/\r$//' /app/*.sh && chmod 755 /app/*.sh
-ENV PGDATA=/var/lib/vivuviet/postgres \
-    SPRING_PROFILES_ACTIVE=docker \
-    JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=60.0"
-VOLUME ["/var/lib/vivuviet"]
+COPY docker/healthcheck.sh /app/healthcheck.sh
+RUN sed -i 's/\r$//' /app/healthcheck.sh && chmod 755 /app/healthcheck.sh
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=60.0"
+USER 10001
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=5s --start-period=120s --retries=5 \
     CMD ["/app/healthcheck.sh"]
-ENTRYPOINT ["/usr/bin/tini", "--", "/app/start.sh"]
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
