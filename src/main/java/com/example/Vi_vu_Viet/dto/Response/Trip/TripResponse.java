@@ -8,7 +8,6 @@ import lombok.Data;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -53,8 +52,6 @@ public class TripResponse {
     TripStatus status;
 
     TripSalesStatus salesStatus;
-
-    List<TripStopResponse> stops;
 
     LocalDateTime createdAt;
 

@@ -3,7 +3,6 @@ package com.example.Vi_vu_Viet.Controller.Trip;
 import com.example.Vi_vu_Viet.Service.Trip.RouteService;
 import com.example.Vi_vu_Viet.dto.Request.BaseRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.CreateRouteRequest;
-import com.example.Vi_vu_Viet.dto.Request.Trip.ReplaceRouteStopsRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.UpdateRouteRequest;
 import com.example.Vi_vu_Viet.dto.Response.BaseResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.RouteResponse;
@@ -21,7 +20,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -41,7 +39,7 @@ public class RouteController {
 
     @Operation(
             summary = "Danh sách tuyến của hãng",
-            description = "Lấy danh sách tuyến và các điểm dừng mẫu thuộc hãng trong URL."
+            description = "Lấy danh sách tuyến của hãng trong URL cùng khu vực đầu và cuối mỗi tuyến."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lấy danh sách tuyến thành công"),
@@ -79,7 +77,7 @@ public class RouteController {
 
     @Operation(
             summary = "Chi tiết tuyến",
-            description = "Lấy chi tiết tuyến và danh sách điểm dừng mẫu thuộc hãng."
+            description = "Lấy chi tiết tuyến cùng khu vực đầu và cuối tuyến."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lấy tuyến thành công"),
@@ -119,25 +117,4 @@ public class RouteController {
         return routeService.updateRoute(companyId, routeId, request.getWsRequest());
     }
 
-    @Operation(
-            summary = "Thay thế điểm dừng của tuyến",
-            description = "Thay toàn bộ danh sách điểm dừng mẫu. Mỗi điểm phải đang hoạt động và thuộc cùng hãng."
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Cập nhật điểm dừng thành công"),
-            @ApiResponse(responseCode = "400", description = "Danh sách điểm dừng không hợp lệ hoặc điểm không thuộc hãng"),
-            @ApiResponse(responseCode = "401", description = "Access token không hợp lệ hoặc đã hết hạn"),
-            @ApiResponse(responseCode = "403", description = "Không có quyền quản lý hãng này"),
-            @ApiResponse(responseCode = "404", description = "Không tìm thấy tuyến trong hãng này")
-    })
-    @PutMapping("/{route_id}/stops")
-    public BaseResponse<RouteResponse> replaceRouteStops(
-            @Parameter(description = "ID hãng xe")
-            @PathVariable("company_id") UUID companyId,
-            @Parameter(description = "ID tuyến")
-            @PathVariable("route_id") UUID routeId,
-            @Valid @RequestBody BaseRequest<ReplaceRouteStopsRequest> request
-    ) {
-        return routeService.replaceRouteStops(companyId, routeId, request.getWsRequest());
-    }
 }

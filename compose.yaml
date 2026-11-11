@@ -14,6 +14,7 @@ services:
       DB_USERNAME: ${DB_USERNAME:-vivuviet}
       DB_PASSWORD: ${DB_PASSWORD:-vivuviet_dev_password}
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-local-development-only-change-me-32-chars-min}
+      APP_SEED_DEMO_DATA: ${APP_SEED_DEMO_DATA:-true}
     depends_on:
       db:
         condition: service_healthy

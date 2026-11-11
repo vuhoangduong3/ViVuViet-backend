@@ -11,5 +11,7 @@ import java.util.UUID;
 @Repository
 public interface BusCompanyRepository extends JpaRepository<BusCompany, UUID> {
 
+    Optional<BusCompany> findBySlug(String slug);
+
     Optional<BusCompany> findByIdAndStatus(UUID id, BusCompanyStatus status);
 }

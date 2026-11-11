@@ -3,28 +3,42 @@ package com.example.Vi_vu_Viet.Service.Trip.Implement;
 import com.example.Vi_vu_Viet.Entity.Auth.UserAccount;
 import com.example.Vi_vu_Viet.Entity.Trip.BusCompany;
 import com.example.Vi_vu_Viet.Entity.Trip.Route;
-import com.example.Vi_vu_Viet.Entity.Trip.RouteStop;
-import com.example.Vi_vu_Viet.Entity.Trip.Stop;
 import com.example.Vi_vu_Viet.Entity.Trip.Trip;
-import com.example.Vi_vu_Viet.Entity.Trip.TripStop;
+import com.example.Vi_vu_Viet.Entity.Trip.TripAssignment;
+import com.example.Vi_vu_Viet.Entity.Trip.Booking;
+import com.example.Vi_vu_Viet.Entity.Trip.Ticket;
+import com.example.Vi_vu_Viet.Entity.Trip.Vehicle;
 import com.example.Vi_vu_Viet.Repository.Auth.UserRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.BusCompanyRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.RouteRepository;
-import com.example.Vi_vu_Viet.Repository.Trip.RouteStopRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.TripRepository;
-import com.example.Vi_vu_Viet.Repository.Trip.TripStopRepository;
+import com.example.Vi_vu_Viet.Repository.Trip.TripSeatRepository;
+import com.example.Vi_vu_Viet.Repository.Trip.TripAssignmentRepository;
+import com.example.Vi_vu_Viet.Repository.Trip.BookingRepository;
+import com.example.Vi_vu_Viet.Repository.Trip.TicketRepository;
+import com.example.Vi_vu_Viet.Repository.Trip.CompanyMemberRepository;
+import com.example.Vi_vu_Viet.Repository.Trip.VehicleRepository;
 import com.example.Vi_vu_Viet.Service.Trip.TripService;
 import com.example.Vi_vu_Viet.Util.ApplicationCode;
 import com.example.Vi_vu_Viet.Util.Enums.BusCompanyStatus;
 import com.example.Vi_vu_Viet.Util.Enums.RouteStatus;
-import com.example.Vi_vu_Viet.Util.Enums.StopStatus;
 import com.example.Vi_vu_Viet.Util.Enums.TripSalesStatus;
 import com.example.Vi_vu_Viet.Util.Enums.TripStatus;
+import com.example.Vi_vu_Viet.Util.Enums.DriverAssignmentStatus;
+import com.example.Vi_vu_Viet.Util.Enums.CompanyMemberStatus;
+import com.example.Vi_vu_Viet.Util.Enums.CompanyMemberRoleType;
+import com.example.Vi_vu_Viet.Util.Enums.UserAccountStatus;
+import com.example.Vi_vu_Viet.Util.Enums.BookingStatus;
+import com.example.Vi_vu_Viet.Util.Enums.TicketStatus;
+import com.example.Vi_vu_Viet.Util.Enums.VehicleStatus;
+import com.example.Vi_vu_Viet.dto.Request.Trip.AssignTripRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.CreateTripRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.UpdateTripRequest;
 import com.example.Vi_vu_Viet.dto.Response.BaseResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripResponse;
-import com.example.Vi_vu_Viet.dto.Response.Trip.TripStopResponse;
+import com.example.Vi_vu_Viet.dto.Response.Trip.TripAssignmentResponse;
+import com.example.Vi_vu_Viet.dto.Response.Trip.TripPassengerBookingResponse;
+import com.example.Vi_vu_Viet.dto.Response.Booking.TicketResponse;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -36,8 +50,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -52,35 +65,115 @@ public class TripServiceImpl implements TripService {
     BusCompanyRepository busCompanyRepository;
     UserRepository userRepository;
     RouteRepository routeRepository;
-    RouteStopRepository routeStopRepository;
     TripRepository tripRepository;
-    TripStopRepository tripStopRepository;
+    TripSeatRepository tripSeatRepository;
     TripResponseMapper tripResponseMapper;
+    TripAssignmentRepository tripAssignmentRepository;
+    BookingRepository bookingRepository;
+    TicketRepository ticketRepository;
+    CompanyMemberRepository companyMemberRepository;
+    VehicleRepository vehicleRepository;
 
     @Override
     @Transactional(readOnly = true)
-    public BaseResponse<List<TripResponse>> getCompanyTrips(UUID companyId) {
+    public BaseResponse<List<TripResponse>> getCompanyTrips(UUID companyId, LocalDate date, TripStatus status,
+                                                             UUID routeId, String assignmentStatus) {
         getActiveCompany(companyId);
-        List<Trip> trips = tripRepository.findAllByCompanyId(companyId);
-        Map<UUID, List<TripStopResponse>> stopsByTrip = new HashMap<>();
-        if (!trips.isEmpty()) {
-            List<UUID> tripIds = trips.stream().map(Trip::getId).toList();
-            stopsByTrip = tripStopRepository.findAllByCompanyIdAndTripIds(companyId, tripIds)
-                    .stream()
-                    .collect(Collectors.groupingBy(
-                            tripStop -> tripStop.getTrip_id().getId(),
-                            Collectors.mapping(tripResponseMapper::toTripStopResponse, Collectors.toList())
-                    ));
+        if (assignmentStatus != null && !assignmentStatus.equalsIgnoreCase("ASSIGNED")
+                && !assignmentStatus.equalsIgnoreCase("UNASSIGNED")) {
+            throw badRequest("assignmentStatus must be ASSIGNED or UNASSIGNED");
         }
-
-        Map<UUID, List<TripStopResponse>> finalStopsByTrip = stopsByTrip;
-        List<TripResponse> results = trips.stream()
-                .map(trip -> tripResponseMapper.toTripResponse(
-                        trip,
-                        finalStopsByTrip.getOrDefault(trip.getId(), List.of())
-                ))
+        List<TripResponse> trips = tripRepository.findAllByCompanyId(companyId).stream()
+                .filter(trip -> date == null || trip.getDeparture_at().toLocalDate().equals(date))
+                .filter(trip -> status == null || trip.getStatus() == status)
+                .filter(trip -> routeId == null || trip.getRoute_id().getId().equals(routeId))
+                .filter(trip -> assignmentStatus == null ||
+                        tripAssignmentRepository.existsByCompanyAndTrip(companyId, trip.getId())
+                                == assignmentStatus.equalsIgnoreCase("ASSIGNED"))
+                .map(tripResponseMapper::toTripResponse)
                 .toList();
-        return success(results);
+        return success(trips);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BaseResponse<List<TripPassengerBookingResponse>> getTripBookings(UUID companyId, UUID tripId) {
+        getActiveCompany(companyId);
+        getCompanyTripEntity(companyId, tripId);
+        List<Booking> bookings = bookingRepository.findAllForCompanyTrip(companyId, tripId);
+        if (bookings.isEmpty()) return successBookings(List.of());
+        LocalDateTime now = LocalDateTime.now();
+        List<UUID> bookingIds = bookings.stream().map(Booking::getId).toList();
+        Map<UUID, List<Ticket>> ticketsByBooking = ticketRepository.findAllByBookingIds(bookingIds).stream()
+                .collect(Collectors.groupingBy(ticket -> ticket.getBooking_id().getId()));
+        List<TripPassengerBookingResponse> results = bookings.stream().map(booking -> {
+            boolean expiredHold = booking.getStatus() == BookingStatus.HOLDING
+                    && !booking.getHold_expires_at().isAfter(now);
+            TripPassengerBookingResponse response = new TripPassengerBookingResponse();
+            response.setId(booking.getId());
+            response.setBookingCode(booking.getBooking_code());
+            response.setStatus(expiredHold ? BookingStatus.EXPIRED : booking.getStatus());
+            response.setContactName(booking.getContact_name());
+            response.setContactPhone(booking.getContact_phone());
+            response.setContactEmail(booking.getContact_email());
+            response.setCreatedAt(booking.getCreated_at());
+            response.setPassengers(ticketsByBooking.getOrDefault(booking.getId(), List.of()).stream()
+                    .map(ticket -> toPassengerResponse(ticket, expiredHold)).toList());
+            return response;
+        }).toList();
+        return successBookings(results);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BaseResponse<TripAssignmentResponse> getTripAssignment(UUID companyId, UUID tripId) {
+        getActiveCompany(companyId);
+        getCompanyTripEntity(companyId, tripId);
+        return successAssignment(tripAssignmentRepository.findByCompanyAndTrip(companyId, tripId)
+                .map(this::toAssignmentResponse).orElse(null));
+    }
+
+    @Override
+    @Transactional
+    public BaseResponse<TripAssignmentResponse> assignTrip(UUID companyId, UUID tripId,
+                                                            AssignTripRequest request, UserAccount actor) {
+        BusCompany company = getActiveCompany(companyId);
+        Trip trip = tripRepository.findByIdAndCompanyIdForUpdate(companyId, tripId)
+                .orElseThrow(() -> notFound("Trip was not found for this company"));
+        if (trip.getStatus() == TripStatus.COMPLETED || trip.getStatus() == TripStatus.CANCELLED
+                || trip.getStatus() == TripStatus.TERMINATED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "A finished or cancelled trip cannot be assigned");
+        }
+        Vehicle vehicle = vehicleRepository.findActiveForCompany(request.getVehicleId(), companyId,
+                        VehicleStatus.ACTIVE)
+                .orElseThrow(() -> notFound("Active vehicle was not found for this company"));
+        UserAccount driver = userRepository.findById(request.getDriverId())
+                .filter(user -> user.getAccount_status() == UserAccountStatus.ACTIVE)
+                .orElseThrow(() -> notFound("Active driver account was not found"));
+        if (!companyMemberRepository.hasCompanyRole(companyId, driver.getId(),
+                CompanyMemberStatus.ACTIVE, CompanyMemberRoleType.DRIVER)) {
+            throw badRequest("Driver must have an active DRIVER role in this company");
+        }
+        if (tripAssignmentRepository.hasVehicleTimeConflict(vehicle.getId(), tripId,
+                trip.getDeparture_at(), trip.getExpected_arrival_at())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Vehicle is already assigned during this trip");
+        }
+        if (tripAssignmentRepository.hasDriverTimeConflict(driver.getId(), tripId,
+                trip.getDeparture_at(), trip.getExpected_arrival_at())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Driver is already assigned during this trip");
+        }
+        TripAssignment assignment = tripAssignmentRepository.findByCompanyAndTrip(companyId, tripId)
+                .orElseGet(TripAssignment::new);
+        assignment.setCompany_id(company);
+        assignment.setTrip_id(trip);
+        assignment.setVehicle_id(vehicle);
+        assignment.setDriver_user_id(driver);
+        assignment.setAssigned_by(actor == null ? null : userRepository.findById(actor.getId()).orElse(null));
+        assignment.setAssigned_at(LocalDateTime.now());
+        assignment.setAssignment_status(DriverAssignmentStatus.ASSIGNED);
+        assignment.setAccepted_at(null);
+        assignment.setRejection_reason(null);
+        return successAssignment(toAssignmentResponse(tripAssignmentRepository.save(assignment)));
     }
 
     @Override
@@ -88,47 +181,34 @@ public class TripServiceImpl implements TripService {
     public BaseResponse<TripResponse> createTrip(UUID companyId, CreateTripRequest request, UserAccount actor) {
         BusCompany company = getActiveCompany(companyId);
         Route route = getActiveCompanyRoute(companyId, request.getRouteId());
-        List<RouteStop> routeStops = routeStopRepository.findAllByCompanyIdAndRouteId(companyId, route.getId());
-        validateRouteStops(routeStops);
-
         LocalDateTime bookingCutoffAt = request.getBookingCutoffAt() == null
                 ? request.getDepartureAt().minusMinutes(30)
                 : request.getBookingCutoffAt();
         validateSchedule(request.getDepartureAt(), request.getExpectedArrivalAt(), bookingCutoffAt);
-        validateTripCodeAvailable(companyId, request.getTripCode());
+        String tripCode = normalizeTripCode(request.getTripCode());
+        validateTripCodeAvailable(companyId, tripCode);
 
         Trip trip = new Trip();
         trip.setCompany_id(company);
         trip.setRoute_id(route);
-        trip.setTrip_code(normalizeTripCode(request.getTripCode()));
+        trip.setTrip_code(tripCode);
         trip.setDeparture_at(request.getDepartureAt());
         trip.setExpected_arrival_at(request.getExpectedArrivalAt());
         trip.setBooking_cutoff_at(bookingCutoffAt);
         trip.setStatus(TripStatus.DRAFT);
         trip.setSales_status(TripSalesStatus.CLOSED);
-        trip.setCreated_by(actor == null
-                ? null
-                : userRepository.findById(actor.getId())
-                        .orElseThrow(() -> new ResponseStatusException(
-                                HttpStatus.UNAUTHORIZED,
-                                "Authenticated user was not found"
-                        )));
+        trip.setCreated_by(actor == null ? null : userRepository.findById(actor.getId())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Authenticated user was not found")));
 
-        Trip savedTrip = tripRepository.save(trip);
-        List<TripStop> tripStops = createTripStopSnapshots(company, savedTrip, routeStops);
-        validateTripStopTimes(savedTrip, tripStops);
-        tripStopRepository.saveAll(tripStops);
-        tripStopRepository.flush();
-
-        return success(tripResponseMapper.toTripResponse(savedTrip, mapStops(companyId, savedTrip.getId())));
+        return success(tripResponseMapper.toTripResponse(tripRepository.save(trip)));
     }
 
     @Override
     @Transactional(readOnly = true)
     public BaseResponse<TripResponse> getCompanyTrip(UUID companyId, UUID tripId) {
         getActiveCompany(companyId);
-        Trip trip = getCompanyTripEntity(companyId, tripId);
-        return success(tripResponseMapper.toTripResponse(trip, mapStops(companyId, tripId)));
+        return success(tripResponseMapper.toTripResponse(getCompanyTripEntity(companyId, tripId)));
     }
 
     @Override
@@ -140,9 +220,7 @@ public class TripServiceImpl implements TripService {
         if (trip.getStatus() != TripStatus.DRAFT || trip.getSales_status() != TripSalesStatus.CLOSED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only draft trips can be updated");
         }
-        if (!hasChanges(request)) {
-            throw badRequest("At least one trip field must be provided");
-        }
+        if (!hasChanges(request)) throw badRequest("At least one trip field must be provided");
 
         if (request.getTripCode() != null) {
             String tripCode = normalizeTripCode(request.getTripCode());
@@ -151,32 +229,21 @@ public class TripServiceImpl implements TripService {
             }
             trip.setTrip_code(tripCode);
         }
-
         if (request.getDepartureAt() != null) {
-            LocalDateTime oldDepartureAt = trip.getDeparture_at();
-            LocalDateTime newDepartureAt = request.getDepartureAt();
-            Duration shift = Duration.between(oldDepartureAt, newDepartureAt);
-            trip.setDeparture_at(newDepartureAt);
+            Duration shift = Duration.between(trip.getDeparture_at(), request.getDepartureAt());
+            trip.setDeparture_at(request.getDepartureAt());
             if (request.getExpectedArrivalAt() == null) {
                 trip.setExpected_arrival_at(trip.getExpected_arrival_at().plus(shift));
             }
             if (request.getBookingCutoffAt() == null) {
                 trip.setBooking_cutoff_at(trip.getBooking_cutoff_at().plus(shift));
             }
-            shiftTripStopTimes(companyId, tripId, shift);
         }
-        if (request.getExpectedArrivalAt() != null) {
-            trip.setExpected_arrival_at(request.getExpectedArrivalAt());
-        }
-        if (request.getBookingCutoffAt() != null) {
-            trip.setBooking_cutoff_at(request.getBookingCutoffAt());
-        }
+        if (request.getExpectedArrivalAt() != null) trip.setExpected_arrival_at(request.getExpectedArrivalAt());
+        if (request.getBookingCutoffAt() != null) trip.setBooking_cutoff_at(request.getBookingCutoffAt());
 
         validateSchedule(trip.getDeparture_at(), trip.getExpected_arrival_at(), trip.getBooking_cutoff_at());
-        validateTripStopTimes(trip, mapStopEntities(companyId, tripId));
-
-        Trip savedTrip = tripRepository.save(trip);
-        return success(tripResponseMapper.toTripResponse(savedTrip, mapStops(companyId, tripId)));
+        return success(tripResponseMapper.toTripResponse(tripRepository.save(trip)));
     }
 
     @Override
@@ -185,32 +252,27 @@ public class TripServiceImpl implements TripService {
         getActiveCompany(companyId);
         Trip trip = tripRepository.findByIdAndCompanyIdForUpdate(companyId, tripId)
                 .orElseThrow(() -> notFound("Trip was not found for this company"));
-
         if (trip.getStatus() == TripStatus.SCHEDULED && trip.getSales_status() == TripSalesStatus.OPEN) {
-            return success(tripResponseMapper.toTripResponse(trip, mapStops(companyId, tripId)));
+            return success(tripResponseMapper.toTripResponse(trip));
         }
         if (trip.getStatus() != TripStatus.DRAFT || trip.getSales_status() != TripSalesStatus.CLOSED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only draft trips can be published");
         }
 
-        List<TripStop> tripStops = mapStopEntities(companyId, tripId);
         validateSchedule(trip.getDeparture_at(), trip.getExpected_arrival_at(), trip.getBooking_cutoff_at());
-        validateTripStopTimes(trip, tripStops);
-        if (tripStops.size() < 2) {
-            throw badRequest("A trip must have at least two stops before it can be published");
-        }
-        validateStopsForPublishing(tripStops);
         if (trip.getBooking_cutoff_at().isBefore(LocalDateTime.now())) {
             throw badRequest("Booking cutoff must be in the future when publishing a trip");
         }
         if (trip.getRoute_id().getBase_fare_amount() == null || trip.getRoute_id().getBase_fare_amount() <= 0) {
             throw badRequest("The route must have a positive default fare before publishing");
         }
+        if (tripSeatRepository.countByCompanyIdAndTripId(companyId, tripId) == 0) {
+            throw badRequest("Configure at least one seat before publishing the trip");
+        }
 
         trip.setStatus(TripStatus.SCHEDULED);
         trip.setSales_status(TripSalesStatus.OPEN);
-        Trip savedTrip = tripRepository.save(trip);
-        return success(tripResponseMapper.toTripResponse(savedTrip, mapStops(companyId, tripId)));
+        return success(tripResponseMapper.toTripResponse(tripRepository.save(trip)));
     }
 
     private BusCompany getActiveCompany(UUID companyId) {
@@ -221,9 +283,7 @@ public class TripServiceImpl implements TripService {
     private Route getActiveCompanyRoute(UUID companyId, UUID routeId) {
         Route route = routeRepository.findByIdAndCompanyId(companyId, routeId)
                 .orElseThrow(() -> notFound("Route was not found for this company"));
-        if (route.getStatus() != RouteStatus.ACTIVE) {
-            throw badRequest("Route is inactive");
-        }
+        if (route.getStatus() != RouteStatus.ACTIVE) throw badRequest("Route is inactive");
         return route;
     }
 
@@ -232,166 +292,59 @@ public class TripServiceImpl implements TripService {
                 .orElseThrow(() -> notFound("Trip was not found for this company"));
     }
 
-    private void validateRouteStops(List<RouteStop> routeStops) {
-        if (routeStops.size() < 2) {
-            throw badRequest("The route must have at least two stops before creating a trip");
-        }
-        for (int i = 0; i < routeStops.size(); i++) {
-            RouteStop routeStop = routeStops.get(i);
-            if (routeStop.getSequence_no() == null || routeStop.getSequence_no() != i + 1) {
-                throw badRequest("Route stop sequence numbers must be continuous and start at 1");
-            }
-            if (routeStop.getStop_id().getStatus() != StopStatus.ACTIVE) {
-                throw badRequest("All route stops must be active before creating a trip");
-            }
-        }
+    private TripAssignmentResponse toAssignmentResponse(TripAssignment assignment) {
+        TripAssignmentResponse response = new TripAssignmentResponse();
+        response.setTripId(assignment.getTrip_id().getId());
+        response.setVehicleId(assignment.getVehicle_id().getId());
+        response.setDriverId(assignment.getDriver_user_id().getId());
+        response.setDriverName(assignment.getDriver_user_id().getFull_name());
+        response.setDriverPhone(assignment.getDriver_user_id().getPhone());
+        response.setAssignedAt(assignment.getAssigned_at());
+        return response;
     }
 
-    private List<TripStop> createTripStopSnapshots(
-            BusCompany company,
-            Trip trip,
-            List<RouteStop> routeStops
-    ) {
-        List<TripStop> snapshots = new ArrayList<>();
-        for (RouteStop routeStop : routeStops) {
-            Stop stop = routeStop.getStop_id();
-            TripStop tripStop = new TripStop();
-            tripStop.setCompany_id(company);
-            tripStop.setTrip_id(trip);
-            tripStop.setStop_id(stop);
-            tripStop.setArea_id(stop.getArea_id());
-            tripStop.setSequence_no(routeStop.getSequence_no());
-            tripStop.setName_snapshot(stop.getName());
-            tripStop.setAddress_snapshot(stop.getAddress());
-            tripStop.setPlanned_arrival_at(toPlannedTime(
-                    trip.getDeparture_at(),
-                    routeStop.getArrival_offset_minutes(),
-                    routeStop.getSequence_no() == 1
-            ));
-            tripStop.setPlanned_departure_at(toPlannedTime(
-                    trip.getDeparture_at(),
-                    routeStop.getDeparture_offset_minutes(),
-                    routeStop.getSequence_no() == 1
-            ));
-            tripStop.setPickup_allowed(routeStop.getPickup_allowed());
-            tripStop.setDropoff_allowed(routeStop.getDropoff_allowed());
-            snapshots.add(tripStop);
-        }
-        return snapshots;
+    private TicketResponse toPassengerResponse(Ticket ticket, boolean expiredHold) {
+        TicketResponse response = new TicketResponse();
+        response.setId(ticket.getId());
+        response.setTicketCode(ticket.getTicket_code());
+        response.setPassengerName(ticket.getPassenger_name());
+        response.setPassengerPhone(ticket.getPassenger_phone());
+        response.setPickupAddress(ticket.getPickup_address());
+        response.setDropoffAddress(ticket.getDropoff_address());
+        response.setSeatId(ticket.getTrip_seat_id().getId());
+        response.setSeatCode(ticket.getSeat_label_snapshot());
+        response.setSeatClass(ticket.getTrip_seat_id().getSeat_class());
+        response.setFareAmount(ticket.getFare_amount());
+        response.setStatus(expiredHold && ticket.getStatus() == TicketStatus.HOLDING
+                ? TicketStatus.EXPIRED : ticket.getStatus());
+        response.setPassengerTripStatus(ticket.getPassenger_trip_status());
+        response.setCreatedAt(ticket.getCreated_at());
+        return response;
     }
 
-    private LocalDateTime toPlannedTime(LocalDateTime departureAt, Integer offsetMinutes, boolean firstStop) {
-        if (offsetMinutes != null) {
-            return departureAt.plusMinutes(offsetMinutes);
-        }
-        return firstStop ? departureAt : null;
-    }
-
-    private void shiftTripStopTimes(UUID companyId, UUID tripId, Duration shift) {
-        if (shift.isZero()) {
-            return;
-        }
-        for (TripStop tripStop : mapStopEntities(companyId, tripId)) {
-            if (tripStop.getPlanned_arrival_at() != null) {
-                tripStop.setPlanned_arrival_at(tripStop.getPlanned_arrival_at().plus(shift));
-            }
-            if (tripStop.getPlanned_departure_at() != null) {
-                tripStop.setPlanned_departure_at(tripStop.getPlanned_departure_at().plus(shift));
-            }
-        }
-    }
-
-    private void validateTripStopTimes(Trip trip, List<TripStop> tripStops) {
-        for (int i = 0; i < tripStops.size(); i++) {
-            TripStop tripStop = tripStops.get(i);
-            validateTimeWithinTrip(tripStop.getPlanned_arrival_at(), trip);
-            validateTimeWithinTrip(tripStop.getPlanned_departure_at(), trip);
-            if (i > 0) {
-                LocalDateTime previousDeparture = tripStops.get(i - 1).getPlanned_departure_at();
-                LocalDateTime currentArrival = tripStop.getPlanned_arrival_at();
-                if (previousDeparture != null && currentArrival != null
-                        && currentArrival.isBefore(previousDeparture)) {
-                    throw badRequest("Trip stop times must follow the stop sequence");
-                }
-            }
-        }
-    }
-
-    private void validateStopsForPublishing(List<TripStop> tripStops) {
-        for (TripStop tripStop : tripStops) {
-            if (Boolean.TRUE.equals(tripStop.getPickup_allowed())
-                    && tripStop.getPlanned_departure_at() == null) {
-                throw badRequest("Every pickup stop needs a planned departure time");
-            }
-            if (Boolean.TRUE.equals(tripStop.getDropoff_allowed())
-                    && tripStop.getPlanned_arrival_at() == null) {
-                throw badRequest("Every dropoff stop needs a planned arrival time");
-            }
-        }
-
-        boolean hasSellableSegment = tripStops.stream()
-                .filter(stop -> Boolean.TRUE.equals(stop.getPickup_allowed()))
-                .anyMatch(boardingStop -> tripStops.stream().anyMatch(alightingStop ->
-                        Boolean.TRUE.equals(alightingStop.getDropoff_allowed())
-                                && boardingStop.getSequence_no() < alightingStop.getSequence_no()
-                ));
-        if (!hasSellableSegment) {
-            throw badRequest("The trip needs an ordered pickup and dropoff pair before publishing");
-        }
-    }
-
-    private void validateTimeWithinTrip(LocalDateTime time, Trip trip) {
-        if (time != null && (time.isBefore(trip.getDeparture_at())
-                || time.isAfter(trip.getExpected_arrival_at()))) {
-            throw badRequest("Trip stop schedule must be between departure and expected arrival");
-        }
-    }
-
-    private void validateSchedule(
-            LocalDateTime departureAt,
-            LocalDateTime expectedArrivalAt,
-            LocalDateTime bookingCutoffAt
-    ) {
+    private void validateSchedule(LocalDateTime departureAt, LocalDateTime expectedArrivalAt,
+                                  LocalDateTime bookingCutoffAt) {
         if (departureAt == null || expectedArrivalAt == null || bookingCutoffAt == null) {
             throw badRequest("Departure, expected arrival, and booking cutoff are required");
         }
-        if (!expectedArrivalAt.isAfter(departureAt)) {
-            throw badRequest("Expected arrival must be later than departure");
-        }
-        if (!bookingCutoffAt.isBefore(departureAt)) {
-            throw badRequest("Booking cutoff must be earlier than departure");
-        }
+        if (!expectedArrivalAt.isAfter(departureAt)) throw badRequest("Expected arrival must be later than departure");
+        if (!bookingCutoffAt.isBefore(departureAt)) throw badRequest("Booking cutoff must be earlier than departure");
     }
 
     private void validateTripCodeAvailable(UUID companyId, String tripCode) {
-        String normalized = normalizeTripCode(tripCode);
-        if (tripRepository.countByCompanyIdAndTripCode(companyId, normalized) > 0) {
+        if (tripRepository.countByCompanyIdAndTripCode(companyId, tripCode) > 0) {
             throw badRequest("Trip code already exists for this company");
         }
     }
 
     private String normalizeTripCode(String tripCode) {
-        if (!StringUtils.hasText(tripCode)) {
-            throw badRequest("Trip code must not be blank");
-        }
+        if (!StringUtils.hasText(tripCode)) throw badRequest("Trip code must not be blank");
         return tripCode.trim().toUpperCase(Locale.ROOT);
     }
 
     private boolean hasChanges(UpdateTripRequest request) {
-        return request.getTripCode() != null
-                || request.getDepartureAt() != null
-                || request.getExpectedArrivalAt() != null
-                || request.getBookingCutoffAt() != null;
-    }
-
-    private List<TripStop> mapStopEntities(UUID companyId, UUID tripId) {
-        return tripStopRepository.findAllByCompanyIdAndTripId(companyId, tripId);
-    }
-
-    private List<TripStopResponse> mapStops(UUID companyId, UUID tripId) {
-        return mapStopEntities(companyId, tripId).stream()
-                .map(tripResponseMapper::toTripStopResponse)
-                .toList();
+        return request.getTripCode() != null || request.getDepartureAt() != null
+                || request.getExpectedArrivalAt() != null || request.getBookingCutoffAt() != null;
     }
 
     private BaseResponse<TripResponse> success(TripResponse tripResponse) {
@@ -403,6 +356,19 @@ public class TripServiceImpl implements TripService {
     private BaseResponse<List<TripResponse>> success(List<TripResponse> trips) {
         BaseResponse<List<TripResponse>> response = new BaseResponse<>(ApplicationCode.SUCCESS);
         response.setWsResponse(trips);
+        return response;
+    }
+
+    private BaseResponse<List<TripPassengerBookingResponse>> successBookings(
+            List<TripPassengerBookingResponse> bookings) {
+        BaseResponse<List<TripPassengerBookingResponse>> response = new BaseResponse<>(ApplicationCode.SUCCESS);
+        response.setWsResponse(bookings);
+        return response;
+    }
+
+    private BaseResponse<TripAssignmentResponse> successAssignment(TripAssignmentResponse assignment) {
+        BaseResponse<TripAssignmentResponse> response = new BaseResponse<>(ApplicationCode.SUCCESS);
+        response.setWsResponse(assignment);
         return response;
     }
 

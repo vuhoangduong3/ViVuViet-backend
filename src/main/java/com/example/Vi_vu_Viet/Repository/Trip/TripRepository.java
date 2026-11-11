@@ -78,27 +78,32 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
             @Param("companyStatus") BusCompanyStatus companyStatus
     );
 
-    @Query("select trip, boardingStop, alightingStop from Trip trip " +
-            "join TripStop boardingStop on boardingStop.trip_id.id = trip.id " +
-            "join TripStop alightingStop on alightingStop.trip_id.id = trip.id " +
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select trip from Trip trip where trip.id = :tripId " +
+            "and trip.status = :tripStatus " +
+            "and trip.sales_status = :salesStatus " +
+            "and trip.company_id.status = :companyStatus")
+    Optional<Trip> findPublishedTripByIdForUpdate(
+            @Param("tripId") UUID tripId,
+            @Param("tripStatus") TripStatus tripStatus,
+            @Param("salesStatus") TripSalesStatus salesStatus,
+            @Param("companyStatus") BusCompanyStatus companyStatus
+    );
+
+    @Query("select trip from Trip trip " +
             "join fetch trip.company_id company " +
             "join fetch trip.route_id route " +
             "join fetch route.origin_area_id routeOriginArea " +
             "join fetch route.destination_area_id routeDestinationArea " +
-            "join fetch boardingStop.area_id boardingArea " +
-            "join fetch alightingStop.area_id alightingArea " +
             "where company.status = :companyStatus " +
             "and trip.status = :tripStatus " +
             "and trip.sales_status = :salesStatus " +
-            "and boardingStop.area_id.id = :originAreaId " +
-            "and alightingStop.area_id.id = :destinationAreaId " +
-            "and boardingStop.sequence_no < alightingStop.sequence_no " +
-            "and boardingStop.pickup_allowed = true " +
-            "and alightingStop.dropoff_allowed = true " +
-            "and boardingStop.planned_departure_at >= :departureDateStart " +
-            "and boardingStop.planned_departure_at < :departureDateEnd " +
-            "order by boardingStop.planned_departure_at, trip.id")
-    List<Object[]> searchPublishedTrips(
+            "and route.origin_area_id.id = :originAreaId " +
+            "and route.destination_area_id.id = :destinationAreaId " +
+            "and trip.departure_at >= :departureDateStart " +
+            "and trip.departure_at < :departureDateEnd " +
+            "order by trip.departure_at, trip.id")
+    List<Trip> searchPublishedTrips(
             @Param("originAreaId") UUID originAreaId,
             @Param("destinationAreaId") UUID destinationAreaId,
             @Param("departureDateStart") LocalDateTime departureDateStart,
