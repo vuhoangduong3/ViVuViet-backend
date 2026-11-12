@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -16,6 +17,12 @@ public class RevenueReportResponse {
     TicketStatus status;
     Long tickets;
     Long ticketValue;
+    LocalDate previousFrom;
+    LocalDate previousTo;
+    Long previousRevenue;
+    Long previousTickets;
+    BigDecimal revenueChangePct;
+    BigDecimal ticketsChangePct;
     String currency;
     Boolean actualCollected;
     String note;

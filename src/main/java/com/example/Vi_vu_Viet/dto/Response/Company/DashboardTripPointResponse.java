@@ -13,5 +13,7 @@ import java.util.Map;
 public class DashboardTripPointResponse {
     LocalDate date;
     Long totalTrips;
+    Long revenue;
+    Long ticketCount;
     Map<TripStatus, Long> byStatus;
 }
