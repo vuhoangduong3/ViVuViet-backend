@@ -1,5 +1,8 @@
 package com.example.Vi_vu_Viet.Controller.Trip;
 
+import org.springframework.web.bind.annotation.PutMapping;
+import com.example.Vi_vu_Viet.dto.Response.Trip.VehicleSeatLayoutResponse;
+import com.example.Vi_vu_Viet.dto.Request.Trip.ConfigureVehicleSeatsRequest;
 import com.example.Vi_vu_Viet.Service.Trip.VehicleService;
 import com.example.Vi_vu_Viet.Util.Enums.VehicleStatus;
 import com.example.Vi_vu_Viet.dto.Request.BaseRequest;
@@ -37,6 +40,21 @@ import java.util.UUID;
 public class VehicleController {
 
     VehicleService vehicleService;
+
+    @Operation(summary = "Get vehicle seat layout")
+    @GetMapping("/{vehicle_id}/seats")
+    public BaseResponse<VehicleSeatLayoutResponse> getSeats(
+            @PathVariable("company_id") UUID companyId, @PathVariable("vehicle_id") UUID vehicleId) {
+        return vehicleService.getSeats(companyId, vehicleId);
+    }
+
+    @Operation(summary = "Configure vehicle seat layout", description = "Creates an immutable layout revision. Coordinates start at 1; gaps represent aisles. Seat count sets passengerCapacity. Existing trip snapshots are preserved.")
+    @PutMapping("/{vehicle_id}/seats")
+    public BaseResponse<VehicleSeatLayoutResponse> configureSeats(
+            @PathVariable("company_id") UUID companyId, @PathVariable("vehicle_id") UUID vehicleId,
+            @Valid @RequestBody BaseRequest<ConfigureVehicleSeatsRequest> request) {
+        return vehicleService.configureSeats(companyId, vehicleId, request.getWsRequest());
+    }
 
     @Operation(summary = "Danh sách xe của hãng", description = "Tìm theo biển số/mẫu xe và lọc theo trạng thái.")
     @GetMapping

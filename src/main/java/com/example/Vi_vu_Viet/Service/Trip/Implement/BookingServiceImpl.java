@@ -19,7 +19,6 @@ import com.example.Vi_vu_Viet.Util.Enums.TicketStatus;
 import com.example.Vi_vu_Viet.Util.Enums.TripSalesStatus;
 import com.example.Vi_vu_Viet.Util.Enums.TripStatus;
 import com.example.Vi_vu_Viet.dto.Request.Booking.CreateBookingRequest;
-import com.example.Vi_vu_Viet.dto.Request.Trip.ConfigureTripSeatsRequest;
 import com.example.Vi_vu_Viet.dto.Response.BaseResponse;
 import com.example.Vi_vu_Viet.dto.Response.Booking.BookingResponse;
 import com.example.Vi_vu_Viet.dto.Response.Booking.BookingTripResponse;
@@ -61,41 +60,6 @@ public class BookingServiceImpl implements BookingService {
     TripSeatRepository tripSeatRepository;
     BookingRepository bookingRepository;
     TicketRepository ticketRepository;
-
-    @Override
-    @Transactional
-    public BaseResponse<List<TripSeatResponse>> configureTripSeats(
-            UUID companyId, UUID tripId, ConfigureTripSeatsRequest request) {
-        BusCompany company = busCompanyRepository.findByIdAndStatus(companyId, BusCompanyStatus.ACTIVE)
-                .orElseThrow(() -> notFound("Bus company was not found or is inactive"));
-        Trip trip = tripRepository.findByIdAndCompanyIdForUpdate(companyId, tripId)
-                .orElseThrow(() -> notFound("Trip was not found for this company"));
-        if (trip.getStatus() != TripStatus.DRAFT || trip.getSales_status() != TripSalesStatus.CLOSED) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Seats can only be configured on draft trips");
-        }
-        if (bookingRepository.countByTripId(tripId) > 0) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Seats cannot change after a booking exists");
-        }
-
-        Set<String> codes = new HashSet<>();
-        List<TripSeat> newSeats = new ArrayList<>();
-        for (ConfigureTripSeatsRequest.SeatInput input : request.getSeats()) {
-            String code = input.getSeatCode().trim().toUpperCase(Locale.ROOT);
-            if (!codes.add(code)) throw badRequest("Seat codes must be unique within the trip");
-            TripSeat seat = new TripSeat();
-            seat.setCompany_id(company);
-            seat.setTrip_id(trip);
-            seat.setSeat_code(code);
-            seat.setSeat_class(StringUtils.hasText(input.getSeatClass())
-                    ? input.getSeatClass().trim().toUpperCase(Locale.ROOT)
-                    : "STANDARD");
-            newSeats.add(seat);
-        }
-
-        tripSeatRepository.deleteAllInBatch(tripSeatRepository.findAllByCompanyIdAndTripId(companyId, tripId));
-        List<TripSeat> savedSeats = tripSeatRepository.saveAll(newSeats);
-        return success(toSeatResponses(savedSeats, Set.of()));
-    }
 
     @Override
     @Transactional
@@ -311,6 +275,9 @@ public class BookingServiceImpl implements BookingService {
             response.setId(seat.getId());
             response.setSeatCode(seat.getSeat_code());
             response.setSeatClass(seat.getSeat_class());
+            response.setDeck(seat.getDeck());
+            response.setRowNo(seat.getRow_no());
+            response.setColumnNo(seat.getColumn_no());
             response.setAvailable(!occupiedSeatIds.contains(seat.getId()));
             return response;
         }).toList();

@@ -15,5 +15,8 @@ public class TripSeatResponse {
     UUID id;
     String seatCode;
     String seatClass;
+    Integer deck;
+    Integer rowNo;
+    Integer columnNo;
     boolean available;
 }

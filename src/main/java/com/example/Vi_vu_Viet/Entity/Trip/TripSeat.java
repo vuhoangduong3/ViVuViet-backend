@@ -41,6 +41,14 @@ public class TripSeat extends BaseEntity {
     @JoinColumn(name = "trip_id", nullable = false)
     Trip trip_id;
 
+    // Snapshot coordinates; nullable for legacy inventory awaiting migration.
+    @Column(name = "deck")
+    Integer deck;
+    @Column(name = "row_no")
+    Integer row_no;
+    @Column(name = "column_no")
+    Integer column_no;
+
     @Column(name = "seat_code", nullable = false, length = 20)
     String seat_code;
 

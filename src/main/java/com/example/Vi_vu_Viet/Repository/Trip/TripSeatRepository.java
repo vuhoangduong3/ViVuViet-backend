@@ -14,7 +14,7 @@ import java.util.UUID;
 public interface TripSeatRepository extends JpaRepository<TripSeat, UUID> {
 
     @Query("select seat from TripSeat seat where seat.company_id.id = :companyId " +
-            "and seat.trip_id.id = :tripId order by seat.seat_code")
+            "and seat.trip_id.id = :tripId order by seat.deck, seat.row_no, seat.column_no, seat.seat_code")
     List<TripSeat> findAllByCompanyIdAndTripId(
             @Param("companyId") UUID companyId,
             @Param("tripId") UUID tripId

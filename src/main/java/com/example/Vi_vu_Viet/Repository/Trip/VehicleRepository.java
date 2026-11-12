@@ -1,5 +1,7 @@
 package com.example.Vi_vu_Viet.Repository.Trip;
 
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import com.example.Vi_vu_Viet.Entity.Trip.Vehicle;
 import com.example.Vi_vu_Viet.Util.Enums.VehicleStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -32,6 +34,10 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
             "and vehicle.company_id.id = :companyId")
     Optional<Vehicle> findByCompany(@Param("vehicleId") UUID vehicleId,
                                     @Param("companyId") UUID companyId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select vehicle from Vehicle vehicle where vehicle.id = :vehicleId and vehicle.company_id.id = :companyId")
+    Optional<Vehicle> findByCompanyForUpdate(@Param("vehicleId") UUID vehicleId, @Param("companyId") UUID companyId);
 
     @Query("select case when count(vehicle) > 0 then true else false end from Vehicle vehicle " +
             "where vehicle.company_id.id = :companyId and vehicle.plate_normalized = :plate")

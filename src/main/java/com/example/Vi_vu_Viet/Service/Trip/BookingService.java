@@ -3,7 +3,6 @@ package com.example.Vi_vu_Viet.Service.Trip;
 import com.example.Vi_vu_Viet.Entity.Auth.UserAccount;
 import com.example.Vi_vu_Viet.Util.Enums.BookingStatus;
 import com.example.Vi_vu_Viet.dto.Request.Booking.CreateBookingRequest;
-import com.example.Vi_vu_Viet.dto.Request.Trip.ConfigureTripSeatsRequest;
 import com.example.Vi_vu_Viet.dto.Response.BaseResponse;
 import com.example.Vi_vu_Viet.dto.Response.PageResponse;
 import com.example.Vi_vu_Viet.dto.Response.Booking.BookingResponse;
@@ -13,9 +12,6 @@ import java.util.List;
 import java.util.UUID;
 
 public interface BookingService {
-
-    BaseResponse<List<TripSeatResponse>> configureTripSeats(
-            UUID companyId, UUID tripId, ConfigureTripSeatsRequest request);
 
     BaseResponse<List<TripSeatResponse>> getAvailableSeats(UUID tripId);
 

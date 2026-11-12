@@ -1,5 +1,7 @@
 package com.example.Vi_vu_Viet.Service.Trip.Implement;
 
+import com.example.Vi_vu_Viet.Entity.Trip.TripSeat;
+import com.example.Vi_vu_Viet.Repository.Trip.SeatLayoutSeatRepository;
 import com.example.Vi_vu_Viet.Entity.Auth.UserAccount;
 import com.example.Vi_vu_Viet.Entity.Trip.BusCompany;
 import com.example.Vi_vu_Viet.Entity.Trip.Route;
@@ -73,6 +75,7 @@ public class TripServiceImpl implements TripService {
     TicketRepository ticketRepository;
     CompanyMemberRepository companyMemberRepository;
     VehicleRepository vehicleRepository;
+    SeatLayoutSeatRepository seatLayoutSeatRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -144,8 +147,8 @@ public class TripServiceImpl implements TripService {
                 || trip.getStatus() == TripStatus.TERMINATED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "A finished or cancelled trip cannot be assigned");
         }
-        Vehicle vehicle = vehicleRepository.findActiveForCompany(request.getVehicleId(), companyId,
-                        VehicleStatus.ACTIVE)
+        Vehicle vehicle = vehicleRepository.findByCompanyForUpdate(request.getVehicleId(), companyId)
+                .filter(v -> v.getStatus() == VehicleStatus.ACTIVE)
                 .orElseThrow(() -> notFound("Active vehicle was not found for this company"));
         UserAccount driver = userRepository.findById(request.getDriverId())
                 .filter(user -> user.getAccount_status() == UserAccountStatus.ACTIVE)
@@ -164,6 +167,10 @@ public class TripServiceImpl implements TripService {
         }
         TripAssignment assignment = tripAssignmentRepository.findByCompanyAndTrip(companyId, tripId)
                 .orElseGet(TripAssignment::new);
+        if (assignment.getVehicle_id() == null || !assignment.getVehicle_id().getId().equals(vehicle.getId())
+                || trip.getStatus() == TripStatus.DRAFT) {
+            snapshotVehicleSeats(companyId, trip, vehicle);
+        }
         assignment.setCompany_id(company);
         assignment.setTrip_id(trip);
         assignment.setVehicle_id(vehicle);
@@ -266,13 +273,52 @@ public class TripServiceImpl implements TripService {
         if (trip.getRoute_id().getBase_fare_amount() == null || trip.getRoute_id().getBase_fare_amount() <= 0) {
             throw badRequest("The route must have a positive default fare before publishing");
         }
-        if (tripSeatRepository.countByCompanyIdAndTripId(companyId, tripId) == 0) {
-            throw badRequest("Configure at least one seat before publishing the trip");
-        }
+        TripAssignment assignment = tripAssignmentRepository.findByCompanyAndTrip(companyId, tripId)
+                .orElseThrow(() -> badRequest("Assign a vehicle with a seat layout before publishing"));
+        Vehicle vehicle = vehicleRepository.findByCompanyForUpdate(assignment.getVehicle_id().getId(), companyId)
+                .filter(v -> v.getStatus() == VehicleStatus.ACTIVE)
+                .orElseThrow(() -> badRequest("Assigned vehicle must be active"));
+        snapshotVehicleSeats(companyId, trip, vehicle);
 
         trip.setStatus(TripStatus.SCHEDULED);
         trip.setSales_status(TripSalesStatus.OPEN);
         return success(tripResponseMapper.toTripResponse(tripRepository.save(trip)));
+    }
+
+    private void snapshotVehicleSeats(UUID companyId, Trip trip, Vehicle vehicle) {
+        if (vehicle.getSeat_layout() == null) throw badRequest("Configure the vehicle seat layout first");
+        var configured = seatLayoutSeatRepository.findAllByLayoutIdOrderByDeckAscRowNoAscColumnNoAsc(
+                vehicle.getSeat_layout().getId());
+        if (configured.isEmpty() || configured.size() != vehicle.getPassenger_capacity()) {
+            throw badRequest("Vehicle seat layout must match passenger capacity");
+        }
+        var existing = tripSeatRepository.findAllByCompanyIdAndTripId(companyId, trip.getId());
+        var byCode = configured.stream().collect(Collectors.toMap(s -> s.getSeatCode(), s -> s));
+        boolean identical = existing.size() == configured.size() && existing.stream().allMatch(seat -> {
+            var target = byCode.get(seat.getSeat_code());
+            return target != null && java.util.Objects.equals(seat.getSeat_class(), target.getSeatClass())
+                    && java.util.Objects.equals(seat.getDeck(), target.getDeck())
+                    && java.util.Objects.equals(seat.getRow_no(), target.getRowNo())
+                    && java.util.Objects.equals(seat.getColumn_no(), target.getColumnNo());
+        });
+        if (identical) return; // Keep inventory IDs referenced by tickets and selected by customers.
+        if (bookingRepository.countByTripId(trip.getId()) > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Trips with bookings require an identical seat layout when changing vehicles");
+        }
+        tripSeatRepository.deleteAllInBatch(existing);
+        var snapshot = configured.stream().map(source -> {
+            var seat = new TripSeat();
+            seat.setCompany_id(trip.getCompany_id());
+            seat.setTrip_id(trip);
+            seat.setSeat_code(source.getSeatCode());
+            seat.setSeat_class(source.getSeatClass());
+            seat.setDeck(source.getDeck());
+            seat.setRow_no(source.getRowNo());
+            seat.setColumn_no(source.getColumnNo());
+            return seat;
+        }).toList();
+        tripSeatRepository.saveAll(snapshot);
     }
 
     private BusCompany getActiveCompany(UUID companyId) {

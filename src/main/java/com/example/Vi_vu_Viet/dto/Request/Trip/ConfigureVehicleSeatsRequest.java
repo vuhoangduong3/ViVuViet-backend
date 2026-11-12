@@ -1,5 +1,6 @@
 package com.example.Vi_vu_Viet.dto.Request.Trip;
 
+import jakarta.validation.constraints.Positive;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -15,8 +16,12 @@ import java.util.List;
 
 @Data
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@Schema(description = "Danh sách ghế của chuyến nháp")
-public class ConfigureTripSeatsRequest {
+@Schema(description = "Sơ đồ ghế của xe; tầng, hàng và cột bắt đầu từ 1")
+public class ConfigureVehicleSeatsRequest {
+
+    @NotBlank
+    @Size(max = 120)
+    String name;
 
     @NotEmpty
     @Size(max = 100)
@@ -34,5 +39,17 @@ public class ConfigureTripSeatsRequest {
         @NotBlank
         @Size(max = 30)
         String seatClass = "STANDARD";
+
+        @NotNull
+        @Positive
+        Integer deck;
+
+        @NotNull
+        @Positive
+        Integer rowNo;
+
+        @NotNull
+        @Positive
+        Integer columnNo;
     }
 }

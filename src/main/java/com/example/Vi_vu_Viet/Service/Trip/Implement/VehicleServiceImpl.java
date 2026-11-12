@@ -1,5 +1,12 @@
 package com.example.Vi_vu_Viet.Service.Trip.Implement;
 
+import com.example.Vi_vu_Viet.Entity.Trip.SeatLayout;
+import com.example.Vi_vu_Viet.Entity.Trip.SeatLayoutSeat;
+import com.example.Vi_vu_Viet.Repository.Trip.SeatLayoutRepository;
+import com.example.Vi_vu_Viet.Repository.Trip.SeatLayoutSeatRepository;
+import com.example.Vi_vu_Viet.dto.Response.Trip.VehicleSeatLayoutResponse;
+import com.example.Vi_vu_Viet.dto.Request.Trip.ConfigureVehicleSeatsRequest;
+import com.example.Vi_vu_Viet.dto.Response.Trip.VehicleSeatLayoutResponse.Seat;
 import com.example.Vi_vu_Viet.Entity.Trip.BusCompany;
 import com.example.Vi_vu_Viet.Entity.Trip.Vehicle;
 import com.example.Vi_vu_Viet.Repository.Trip.BusCompanyRepository;
@@ -23,6 +30,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -34,6 +43,75 @@ public class VehicleServiceImpl implements VehicleService {
     BusCompanyRepository busCompanyRepository;
     VehicleRepository vehicleRepository;
     TripAssignmentRepository tripAssignmentRepository;
+    SeatLayoutRepository seatLayoutRepository;
+    SeatLayoutSeatRepository seatLayoutSeatRepository;
+
+    @Override
+    @Transactional(readOnly = true)
+    public BaseResponse<VehicleSeatLayoutResponse> getSeats(UUID companyId, UUID vehicleId) {
+        getActiveCompany(companyId);
+        return layoutResponse(getCompanyVehicle(companyId, vehicleId));
+    }
+
+    @Override
+    @Transactional
+    public BaseResponse<VehicleSeatLayoutResponse> configureSeats(
+            UUID companyId, UUID vehicleId, ConfigureVehicleSeatsRequest request) {
+        getActiveCompany(companyId);
+        Vehicle vehicle = vehicleRepository.findByCompanyForUpdate(vehicleId, companyId)
+                .orElseThrow(() -> notFound("Vehicle was not found for this company"));
+        if (vehicle.getStatus() == VehicleStatus.RETIRED) throw badRequest("Cannot configure a retired vehicle");
+        var codes = new HashSet<String>();
+        var positions = new HashSet<String>();
+        var layout = new SeatLayout();
+        layout.setCompany(vehicle.getCompany_id());
+        layout.setName(request.getName().trim());
+        var seats = new ArrayList<SeatLayoutSeat>();
+        for (var input : request.getSeats()) {
+            String code = input.getSeatCode().trim().toUpperCase(Locale.ROOT);
+            if (!codes.add(code)) throw badRequest("Duplicate seat code");
+            if (!positions.add(input.getDeck() + ":" + input.getRowNo() + ":" + input.getColumnNo())) {
+                throw badRequest("Two seats cannot occupy the same position");
+            }
+            var seat = new SeatLayoutSeat();
+            seat.setLayout(layout);
+            seat.setSeatCode(code);
+            seat.setSeatClass(input.getSeatClass().trim().toUpperCase(Locale.ROOT));
+            seat.setDeck(input.getDeck());
+            seat.setRowNo(input.getRowNo());
+            seat.setColumnNo(input.getColumnNo());
+            seats.add(seat);
+        }
+        seatLayoutRepository.save(layout);
+        seatLayoutSeatRepository.saveAll(seats);
+        vehicle.setSeat_layout(layout);
+        vehicle.setPassenger_capacity(seats.size());
+        vehicleRepository.save(vehicle);
+        return layoutResponse(vehicle);
+    }
+
+    private BaseResponse<VehicleSeatLayoutResponse> layoutResponse(Vehicle vehicle) {
+        var result = new VehicleSeatLayoutResponse();
+        result.setVehicleId(vehicle.getId());
+        var layout = vehicle.getSeat_layout();
+        result.setSeatLayoutId(layout == null ? null : layout.getId());
+        result.setName(layout == null ? null : layout.getName());
+        result.setSeats(layout == null ? List.of() : seatLayoutSeatRepository
+                .findAllByLayoutIdOrderByDeckAscRowNoAscColumnNoAsc(layout.getId()).stream().map(seat -> {
+                    var dto = new Seat();
+                    dto.setId(seat.getId());
+                    dto.setSeatCode(seat.getSeatCode());
+                    dto.setSeatClass(seat.getSeatClass());
+                    dto.setDeck(seat.getDeck());
+                    dto.setRowNo(seat.getRowNo());
+                    dto.setColumnNo(seat.getColumnNo());
+                    return dto;
+                }).toList());
+        var response = new BaseResponse<VehicleSeatLayoutResponse>(ApplicationCode.SUCCESS);
+        response.setWsResponse(result);
+        return response;
+    }
+
 
     @Override
     @Transactional(readOnly = true)
@@ -79,7 +157,8 @@ public class VehicleServiceImpl implements VehicleService {
     public BaseResponse<VehicleResponse> updateVehicle(UUID companyId, UUID vehicleId,
                                                        UpdateVehicleRequest request) {
         getActiveCompany(companyId);
-        Vehicle vehicle = getCompanyVehicle(companyId, vehicleId);
+        Vehicle vehicle = vehicleRepository.findByCompanyForUpdate(vehicleId, companyId)
+                .orElseThrow(() -> notFound("Vehicle was not found for this company"));
         if (!hasChanges(request)) throw badRequest("At least one vehicle field must be provided");
 
         if (request.getPlateNumber() != null) {
@@ -95,6 +174,11 @@ public class VehicleServiceImpl implements VehicleService {
             vehicle.setVehicle_model(request.getVehicleModel().trim());
         }
         if (request.getPassengerCapacity() != null) {
+            if (vehicle.getSeat_layout() != null && seatLayoutSeatRepository
+                    .findAllByLayoutIdOrderByDeckAscRowNoAscColumnNoAsc(vehicle.getSeat_layout().getId()).size()
+                    != request.getPassengerCapacity()) {
+                throw badRequest("Capacity must match the configured seat count");
+            }
             vehicle.setPassenger_capacity(request.getPassengerCapacity());
         }
         if (request.getStatus() != null) vehicle.setStatus(request.getStatus());
@@ -106,7 +190,8 @@ public class VehicleServiceImpl implements VehicleService {
     @Transactional
     public BaseResponse<Void> deleteVehicle(UUID companyId, UUID vehicleId) {
         getActiveCompany(companyId);
-        Vehicle vehicle = getCompanyVehicle(companyId, vehicleId);
+        Vehicle vehicle = vehicleRepository.findByCompanyForUpdate(vehicleId, companyId)
+                .orElseThrow(() -> notFound("Vehicle was not found for this company"));
         if (tripAssignmentRepository.existsAssignmentForVehicle(vehicleId)) {
             vehicle.setStatus(VehicleStatus.RETIRED);
             vehicleRepository.save(vehicle);
@@ -145,6 +230,7 @@ public class VehicleServiceImpl implements VehicleService {
         response.setPlateNumber(vehicle.getPlate_normalized());
         response.setVehicleModel(vehicle.getVehicle_model());
         response.setPassengerCapacity(vehicle.getPassenger_capacity());
+        response.setSeatLayoutId(vehicle.getSeat_layout() == null ? null : vehicle.getSeat_layout().getId());
         response.setStatus(vehicle.getStatus());
         response.setCreatedAt(vehicle.getCreated_at());
         response.setUpdatedAt(vehicle.getUpdated_at());

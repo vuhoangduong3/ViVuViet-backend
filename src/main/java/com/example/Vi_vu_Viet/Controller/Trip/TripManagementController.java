@@ -2,9 +2,7 @@ package com.example.Vi_vu_Viet.Controller.Trip;
 
 import com.example.Vi_vu_Viet.Entity.Auth.UserAccount;
 import com.example.Vi_vu_Viet.Service.Trip.TripService;
-import com.example.Vi_vu_Viet.Service.Trip.BookingService;
 import com.example.Vi_vu_Viet.dto.Request.BaseRequest;
-import com.example.Vi_vu_Viet.dto.Request.Trip.ConfigureTripSeatsRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.AssignTripRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.CreateTripRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.UpdateTripRequest;
@@ -12,7 +10,6 @@ import com.example.Vi_vu_Viet.dto.Response.BaseResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripAssignmentResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripPassengerBookingResponse;
-import com.example.Vi_vu_Viet.dto.Response.Booking.TripSeatResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -48,7 +45,6 @@ import com.example.Vi_vu_Viet.Util.Enums.TripStatus;
 public class TripManagementController {
 
     TripService tripService;
-    BookingService bookingService;
 
     @Operation(
             summary = "Danh sách chuyến của hãng",
@@ -169,7 +165,7 @@ public class TripManagementController {
 
     @Operation(
             summary = "Công bố và mở bán chuyến",
-            description = "Mở bán chuyến sau khi đã cấu hình ghế, tuyến, thời gian và giá mặc định."
+            description = "Mở bán chuyến sau khi phân xe có sơ đồ ghế, tuyến, thời gian và giá mặc định."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Mở bán chuyến thành công"),
@@ -189,20 +185,4 @@ public class TripManagementController {
         return tripService.publishTrip(companyId, tripId);
     }
 
-    @Operation(summary = "Cấu hình ghế cho chuyến nháp", description = "Thay toàn bộ danh sách ghế; chỉ dùng khi chuyến chưa có đặt vé.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Đã cấu hình ghế"),
-            @ApiResponse(responseCode = "400", description = "Danh sách ghế không hợp lệ hoặc trùng mã"),
-            @ApiResponse(responseCode = "403", description = "Không có quyền quản lý hãng này"),
-            @ApiResponse(responseCode = "404", description = "Không tìm thấy chuyến"),
-            @ApiResponse(responseCode = "409", description = "Chuyến đã mở bán hoặc đã có đặt vé")
-    })
-    @PutMapping("/{trip_id}/seats")
-    public BaseResponse<List<TripSeatResponse>> configureTripSeats(
-            @PathVariable("company_id") UUID companyId,
-            @PathVariable("trip_id") UUID tripId,
-            @Valid @RequestBody BaseRequest<ConfigureTripSeatsRequest> request
-    ) {
-        return bookingService.configureTripSeats(companyId, tripId, request.getWsRequest());
-    }
 }

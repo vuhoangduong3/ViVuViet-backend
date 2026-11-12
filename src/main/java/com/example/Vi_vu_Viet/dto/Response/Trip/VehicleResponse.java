@@ -16,6 +16,7 @@ public class VehicleResponse {
     String plateNumber;
     String vehicleModel;
     Integer passengerCapacity;
+    UUID seatLayoutId;
     VehicleStatus status;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;

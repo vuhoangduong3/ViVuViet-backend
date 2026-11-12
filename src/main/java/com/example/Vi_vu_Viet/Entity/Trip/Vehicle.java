@@ -40,6 +40,12 @@ public class Vehicle extends BaseEntity {
     @Column(name = "passenger_capacity", nullable = false)
     Integer passenger_capacity;
 
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "seat_layout_id")
+    SeatLayout seat_layout;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     VehicleStatus status;
