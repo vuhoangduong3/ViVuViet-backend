@@ -7,11 +7,23 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface DriverProfileRepository extends JpaRepository<DriverProfile, UUID> {
+
+    @Query("select profile from DriverProfile profile where profile.company_id.id = :companyId " +
+            "and profile.membership_id.id in :membershipIds")
+    List<DriverProfile> findAllByCompanyAndMemberships(@Param("companyId") UUID companyId,
+                                                     @Param("membershipIds") List<UUID> membershipIds);
+
+    @Query("select profile from DriverProfile profile where profile.company_id.id = :companyId " +
+            "and profile.membership_id.company_id.id = :companyId " +
+            "and profile.membership_id.user_id.id = :userId")
+    Optional<DriverProfile> findByCompanyAndUser(@Param("companyId") UUID companyId,
+                                                @Param("userId") UUID userId);
 
     @EntityGraph(attributePaths = {"company_id", "membership_id", "membership_id.user_id"})
     @Query("select profile from DriverProfile profile where profile.company_id.id = :companyId " +

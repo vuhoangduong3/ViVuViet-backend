@@ -81,6 +81,8 @@ public class DriverServiceImpl implements DriverService {
     @Transactional
     public BaseResponse<DriverProfileResponse> updateDriverProfile(UUID userId, UpdateDriverProfileRequest request) {
         if (!hasProfileChanges(request)) throw badRequest("At least one profile field must be provided");
+        // Keep self-service profile changes from overwriting an admin's lock or reset metadata.
+        userRepository.findByIdForUpdate(userId).orElseThrow(() -> notFound("Driver account was not found"));
         CompanyMember membership = companyMemberRepository.findActiveMembershipsByRole(
                         userId, CompanyMemberStatus.ACTIVE, CompanyMemberRoleType.DRIVER).stream()
                 .filter(item -> item.getCompany_id().getId().equals(request.getCompanyId()))

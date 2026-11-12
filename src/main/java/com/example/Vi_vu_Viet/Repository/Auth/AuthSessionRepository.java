@@ -4,15 +4,22 @@ import com.example.Vi_vu_Viet.Entity.Auth.AuthSession;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface AuthSessionRepository extends JpaRepository<AuthSession, UUID> {
+
+    @Modifying
+    @Query("update AuthSession session set session.revoked_at = :revokedAt " +
+            "where session.user_id.id = :userId and session.revoked_at is null")
+    int revokeAllByUserId(@Param("userId") UUID userId, @Param("revokedAt") LocalDateTime revokedAt);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select session from AuthSession session where session.refresh_token_hash = :tokenHash")

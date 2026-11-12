@@ -71,6 +71,7 @@ public final class Enums {
     }
 
     public enum DriverProfileStatus { ACTIVE, SUSPENDED, INACTIVE }
+    public enum CompanyDriverStatus { ACTIVE, LOCKED }
     public enum DriverAssignmentStatus { ASSIGNED, ACCEPTED, REJECTED, PREPARING, ARRIVED, COMPLETED, REPLACED }
     public enum PassengerTripStatus { WAITING_PICKUP, PICKED_UP, DROPPED_OFF, NO_SHOW }
     public enum IncidentType { VEHICLE_BREAKDOWN, ACCIDENT, TRAFFIC, PASSENGER, HEALTH, OTHER }

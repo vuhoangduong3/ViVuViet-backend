@@ -244,6 +244,47 @@ Mỗi phần tử trong `content` có cùng cấu trúc với chi tiết đặt 
 
 Frontend dùng `bookingCode`/`ticketCode` để hiển thị mã đặt vé/vé; `CONFIRMED` là trạng thái đã xác nhận. Chức năng QR check-in, thông tin xe/tài xế và thanh toán chưa có trong mô hình hiện tại.
 
+## API admin quản lý tài xế (màn A3)
+
+Tiền tố: `/api/v1/bus-companies/{company_id}/drivers`. Tất cả endpoint yêu cầu Bearer token và quyền `COMPANY_ADMIN` tại đúng hãng. `driver_id`/`driverId` là ID tài khoản (`users.id`), dùng trực tiếp cho `driverId` của API phân công chuyến; `profileId` là ID hồ sơ GPLX riêng tại hãng.
+
+| Method | Phần sau tiền tố | Chức năng FE |
+| --- | --- | --- |
+| GET | `?search=...&status=ACTIVE&page=0&size=10` | Danh sách, tìm theo tên/SĐT/email; lọc `ACTIVE` hoặc `LOCKED` |
+| POST | (rỗng) | Tạo tài khoản và hồ sơ tài xế mới tại hãng |
+| GET | `/{driver_id}` | Chi tiết tài xế |
+| PATCH | `/{driver_id}` | Sửa thông tin cá nhân và GPLX |
+| PATCH | `/{driver_id}/status` | Khóa/mở khóa và lưu ghi chú |
+| POST | `/{driver_id}/reset-password` | Sinh mật khẩu mới, lưu ghi chú và thu hồi các phiên cũ |
+| GET | `/{driver_id}/trips?page=0&size=10` | Chuyến được phân công gần đây, mới nhất trước |
+
+Request tạo tài xế (email không bắt buộc):
+
+```json
+{
+  "wsRequest": {
+    "fullName": "Nguyễn Văn An",
+    "phone": "0912345001",
+    "email": "an@example.com",
+    "licenseNumber": "012345678901",
+    "licenseClass": "B2",
+    "licenseExpiresOn": "2027-08-14"
+  }
+}
+```
+
+PATCH thông tin nhận cùng các trường trong `wsRequest`, chỉ gửi trường cần thay đổi; `null` giữ nguyên, `email: ""` xóa email. Họ tên từ 3 đến 160 ký tự, SĐT bắt đầu bằng 0 gồm 10–11 chữ số, GPLX đúng 12 chữ số, hạng gồm `B1`, `B2`, `C1`, `C`, `D1`, `D2`, `E`, hạn GPLX phải sau ngày hiện tại. SĐT và email không được trùng tài khoản khác; GPLX không được trùng trong hãng. Ngày trả về dạng ISO `yyyy-MM-dd`.
+
+Request trạng thái: `{"wsRequest":{"status":"LOCKED","note":"Tạm khóa theo yêu cầu điều phối"}}`; mở khóa dùng `ACTIVE`. Khóa lưu trên hồ sơ của hãng, chặn phân công mới và giữ các chuyến đã giao. Tài khoản hoặc membership bị ngừng cần được kích hoạt trước khi mở khóa hồ sơ. Request reset mật khẩu: `{"wsRequest":{"note":"Cấp lại mật khẩu theo yêu cầu"}}`; có thể bỏ `note`, gửi `{"wsRequest":{}}`.
+
+Tạo/reset trả `wsResponse` gồm `driverId`, `fullName`, `login` (SĐT), `temporaryPassword`. Backend dùng `SecureRandom`, chỉ lưu BCrypt hash và trả mật khẩu trong response tạo/reset với `Cache-Control: no-store`; không có API xem lại mật khẩu. FE cần dùng giá trị backend trả về thay cho `genPassword()` đang mô phỏng. Luồng bắt buộc đổi mật khẩu lần đầu trong design chưa được triển khai trong nhóm 7 API này.
+
+Danh sách/chi tiết trả `driverId`, `companyId`, `profileId`, `fullName`, `phone`, `email`, `licenseNumber`, `licenseClass`, `licenseExpiresOn`, `status`, `statusNote`, `tripCount30Days`, `createdAt`, `updatedAt`. Tài xế cũ chưa có hồ sơ vẫn xuất hiện với các trường GPLX và `profileId` bằng `null`; hồ sơ được tạo khi admin cập nhật. `tripCount30Days` đếm chuyến khởi hành trong 30 ngày vừa qua, thuộc hãng hiện tại, trạng thái `SCHEDULED`, `IN_PROGRESS`, `COMPLETED`, bỏ phân công `REJECTED`/`REPLACED`. FE tự tính cảnh báo hạn GPLX trong 45 ngày theo design.
+
+Danh sách tài xế và chuyến trả theo `PageResponse` trong `wsResponse`: `content`, `page`, `size`, `totalElements`, `totalPages`, `first`, `last`. `page >= 0`, `size` từ 1 đến 100. Mỗi chuyến có `tripId`, `tripCode`, `routeName`, `departureAt`, `expectedArrivalAt`, `status`, `assignmentStatus`, `assignedAt`. FE ánh xạ `SCHEDULED` → sắp tới, `IN_PROGRESS` → đang chạy, `COMPLETED` → hoàn thành, `CANCELLED`/`TERMINATED` → đã hủy; `DRAFT` là chuyến nháp. Chuyến bị hủy vẫn có trong lịch sử; phân công bị từ chối/thay thế được bỏ.
+
+Thông tin cá nhân và mật khẩu thuộc tài khoản dùng chung. Để tránh sửa danh tính/chiếm quyền tài khoản ngoài phạm vi hãng, API trả `403` nếu admin đổi thông tin cá nhân hoặc reset mật khẩu của tài khoản có quyền `COMPANY_ADMIN` hay membership ở hãng khác. Admin vẫn quản lý GPLX và trạng thái hồ sơ riêng tại hãng. Endpoint tạo chỉ tạo tài khoản mới; SĐT/email đã đăng ký trả `409`.
+
 ## Kiểm thử
 
 Chạy `./mvnw test` (Windows: `./mvnw.cmd test`). Các bài kiểm thử dùng profile `test` với database H2 trong bộ nhớ, không cần PostgreSQL đang chạy. Bộ kiểm thử khách hàng kiểm tra xác thực, quyền sở hữu vé, cập nhật hồ sơ, dữ liệu vé điện tử, các bộ lọc và phân trang, bao gồm đơn giữ ghế đã hết hạn.

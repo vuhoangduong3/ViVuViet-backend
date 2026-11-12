@@ -18,6 +18,7 @@ import lombok.ToString;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Data
@@ -54,4 +55,13 @@ public class DriverProfile extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     DriverProfileStatus status = DriverProfileStatus.ACTIVE;
+
+    @Column(name = "status_note", length = 500)
+    String status_note;
+
+    @Column(name = "password_reset_note", length = 500)
+    String password_reset_note;
+
+    @Column(name = "password_reset_at")
+    LocalDateTime password_reset_at;
 }

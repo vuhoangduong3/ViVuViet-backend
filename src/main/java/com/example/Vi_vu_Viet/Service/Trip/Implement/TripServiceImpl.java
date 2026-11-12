@@ -19,6 +19,7 @@ import com.example.Vi_vu_Viet.Repository.Trip.TripAssignmentRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.BookingRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.TicketRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.CompanyMemberRepository;
+import com.example.Vi_vu_Viet.Repository.Trip.DriverProfileRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.VehicleRepository;
 import com.example.Vi_vu_Viet.Service.Trip.TripService;
 import com.example.Vi_vu_Viet.Util.ApplicationCode;
@@ -27,6 +28,7 @@ import com.example.Vi_vu_Viet.Util.Enums.RouteStatus;
 import com.example.Vi_vu_Viet.Util.Enums.TripSalesStatus;
 import com.example.Vi_vu_Viet.Util.Enums.TripStatus;
 import com.example.Vi_vu_Viet.Util.Enums.DriverAssignmentStatus;
+import com.example.Vi_vu_Viet.Util.Enums.DriverProfileStatus;
 import com.example.Vi_vu_Viet.Util.Enums.CompanyMemberStatus;
 import com.example.Vi_vu_Viet.Util.Enums.CompanyMemberRoleType;
 import com.example.Vi_vu_Viet.Util.Enums.UserAccountStatus;
@@ -74,6 +76,7 @@ public class TripServiceImpl implements TripService {
     BookingRepository bookingRepository;
     TicketRepository ticketRepository;
     CompanyMemberRepository companyMemberRepository;
+    DriverProfileRepository driverProfileRepository;
     VehicleRepository vehicleRepository;
     SeatLayoutSeatRepository seatLayoutSeatRepository;
 
@@ -150,12 +153,17 @@ public class TripServiceImpl implements TripService {
         Vehicle vehicle = vehicleRepository.findByCompanyForUpdate(request.getVehicleId(), companyId)
                 .filter(v -> v.getStatus() == VehicleStatus.ACTIVE)
                 .orElseThrow(() -> notFound("Active vehicle was not found for this company"));
-        UserAccount driver = userRepository.findById(request.getDriverId())
+        // Serialize assignment with company driver status updates.
+        UserAccount driver = userRepository.findByIdForUpdate(request.getDriverId())
                 .filter(user -> user.getAccount_status() == UserAccountStatus.ACTIVE)
                 .orElseThrow(() -> notFound("Active driver account was not found"));
         if (!companyMemberRepository.hasCompanyRole(companyId, driver.getId(),
                 CompanyMemberStatus.ACTIVE, CompanyMemberRoleType.DRIVER)) {
             throw badRequest("Driver must have an active DRIVER role in this company");
+        }
+        if (driverProfileRepository.findByCompanyAndUser(companyId, driver.getId())
+                .filter(profile -> profile.getStatus() != DriverProfileStatus.ACTIVE).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Driver is locked or inactive for this company");
         }
         if (tripAssignmentRepository.hasVehicleTimeConflict(vehicle.getId(), tripId,
                 trip.getDeparture_at(), trip.getExpected_arrival_at())) {

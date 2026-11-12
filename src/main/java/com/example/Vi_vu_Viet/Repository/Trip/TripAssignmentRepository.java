@@ -4,6 +4,8 @@ import com.example.Vi_vu_Viet.Entity.Trip.TripAssignment;
 import com.example.Vi_vu_Viet.Util.Enums.DriverAssignmentStatus;
 import com.example.Vi_vu_Viet.Util.Enums.TripStatus;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -18,6 +20,31 @@ import java.util.List;
 
 @Repository
 public interface TripAssignmentRepository extends JpaRepository<TripAssignment, UUID> {
+
+    @EntityGraph(attributePaths = {"trip_id", "trip_id.route_id"})
+    @Query("select assignment from TripAssignment assignment " +
+            "where assignment.company_id.id = :companyId and assignment.trip_id.company_id.id = :companyId " +
+            "and assignment.driver_user_id.id = :driverId " +
+            "and assignment.assignment_status not in :excludedStatuses " +
+            "order by assignment.assigned_at desc, assignment.id desc")
+    Page<TripAssignment> findCompanyDriverTrips(@Param("companyId") UUID companyId,
+                                               @Param("driverId") UUID driverId,
+                                               @Param("excludedStatuses") List<DriverAssignmentStatus> excludedStatuses,
+                                               Pageable pageable);
+
+    @Query("select assignment.driver_user_id.id as driverId, count(assignment) as tripCount " +
+            "from TripAssignment assignment " +
+            "where assignment.company_id.id = :companyId and assignment.trip_id.company_id.id = :companyId " +
+            "and assignment.driver_user_id.id in :driverIds " +
+            "and assignment.trip_id.departure_at >= :fromAt and assignment.trip_id.departure_at <= :toAt " +
+            "and assignment.assignment_status not in :excludedStatuses " +
+            "and assignment.trip_id.status in :tripStatuses " +
+            "group by assignment.driver_user_id.id")
+    List<CompanyDriverTripCountProjection> countCompanyDriverTrips(@Param("companyId") UUID companyId,
+            @Param("driverIds") List<UUID> driverIds, @Param("fromAt") LocalDateTime fromAt,
+            @Param("toAt") LocalDateTime toAt,
+            @Param("excludedStatuses") List<DriverAssignmentStatus> excludedStatuses,
+            @Param("tripStatuses") List<TripStatus> tripStatuses);
 
     @EntityGraph(attributePaths = {"driver_user_id"})
     @Query("select assignment from TripAssignment assignment " +
