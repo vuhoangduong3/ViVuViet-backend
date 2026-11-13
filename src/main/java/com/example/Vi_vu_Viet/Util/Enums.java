@@ -57,6 +57,10 @@ public final class Enums {
         EXPIRED
     }
 
+    public enum BookingViewStatus {
+        BOOKED, PICKED_UP, COMPLETED, NO_SHOW, CANCELLED, HOLDING, EXPIRED
+    }
+
     public enum TicketStatus {
         HOLDING,
         CONFIRMED,

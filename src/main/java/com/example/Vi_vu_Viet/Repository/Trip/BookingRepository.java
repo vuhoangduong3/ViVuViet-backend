@@ -9,6 +9,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -21,58 +23,17 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface BookingRepository extends JpaRepository<Booking, UUID> {
-
-    String COMPANY_SEARCH_WHERE = """
-            where booking.company_id.id = :companyId
-              and (:tripId is null or booking.trip_id.id = :tripId)
-              and (:routeId is null or booking.trip_id.route_id.id = :routeId)
-              and (:customerId is null or booking.customer_user_id.id = :customerId)
-              and (cast(:createdFrom as timestamp) is null or booking.created_at >= :createdFrom)
-              and (cast(:createdTo as timestamp) is null or booking.created_at <= :createdTo)
-              and (cast(:departureFrom as timestamp) is null or booking.trip_id.departure_at >= :departureFrom)
-              and (cast(:departureTo as timestamp) is null or booking.trip_id.departure_at <= :departureTo)
-              and (:status is null
-                   or (booking.status = :status and
-                       (:status <> :holdingStatus or booking.hold_expires_at > :now))
-                   or (:status = :expiredStatus and booking.status = :holdingStatus
-                       and booking.hold_expires_at <= :now))
-              and (:pattern is null
-                   or lower(booking.booking_code) like :pattern escape '!'
-                   or lower(booking.contact_name) like :pattern escape '!'
-                   or lower(booking.contact_phone) like :pattern escape '!'
-                   or lower(booking.contact_email) like :pattern escape '!'
-                   or lower(booking.trip_id.trip_code) like :pattern escape '!'
-                   or lower(booking.trip_id.route_id.code) like :pattern escape '!'
-                   or lower(booking.trip_id.route_id.name) like :pattern escape '!'
-                   or exists (select ticket.id from Ticket ticket
-                       where ticket.booking_id.id = booking.id
-                         and (lower(ticket.ticket_code) like :pattern escape '!'
-                              or lower(ticket.passenger_name) like :pattern escape '!'
-                              or lower(ticket.passenger_phone) like :pattern escape '!')))
-            """;
+public interface BookingRepository extends JpaRepository<Booking, UUID>, JpaSpecificationExecutor<Booking> {
 
     @EntityGraph(attributePaths = {"company_id", "trip_id", "trip_id.route_id",
             "trip_id.route_id.origin_area_id", "trip_id.route_id.destination_area_id"})
-    @Query(value = "select booking from Booking booking " + COMPANY_SEARCH_WHERE +
-            " order by booking.created_at desc, booking.id desc",
-            countQuery = "select count(booking) from Booking booking " + COMPANY_SEARCH_WHERE)
-    Page<Booking> searchByCompanyId(
-            @Param("companyId") UUID companyId,
-            @Param("status") BookingStatus status,
-            @Param("tripId") UUID tripId,
-            @Param("routeId") UUID routeId,
-            @Param("customerId") UUID customerId,
-            @Param("createdFrom") LocalDateTime createdFrom,
-            @Param("createdTo") LocalDateTime createdTo,
-            @Param("departureFrom") LocalDateTime departureFrom,
-            @Param("departureTo") LocalDateTime departureTo,
-            @Param("pattern") String pattern,
-            @Param("holdingStatus") BookingStatus holdingStatus,
-            @Param("expiredStatus") BookingStatus expiredStatus,
-            @Param("now") LocalDateTime now,
-            Pageable pageable
-    );
+    @Override
+    Page<Booking> findAll(Specification<Booking> specification, Pageable pageable);
+
+    @Query("select count(booking) from Booking booking where booking.company_id.id = :companyId " +
+            "and booking.trip_id.departure_at >= :fromAt and booking.trip_id.departure_at < :toAt")
+    long countDepartingBookings(@Param("companyId") UUID companyId,
+                               @Param("fromAt") LocalDateTime fromAt, @Param("toAt") LocalDateTime toAt);
 
     @EntityGraph(attributePaths = {"company_id", "trip_id", "trip_id.route_id",
             "trip_id.route_id.origin_area_id", "trip_id.route_id.destination_area_id"})

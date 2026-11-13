@@ -2,15 +2,18 @@ package com.example.Vi_vu_Viet.Service.Trip.Implement;
 
 import com.example.Vi_vu_Viet.Entity.Auth.UserAccount;
 import com.example.Vi_vu_Viet.Entity.Trip.Booking;
+import com.example.Vi_vu_Viet.Entity.Trip.BusCompany;
 import com.example.Vi_vu_Viet.Entity.Trip.Ticket;
 import com.example.Vi_vu_Viet.Entity.Trip.Trip;
 import com.example.Vi_vu_Viet.Repository.Trip.BookingRepository;
+import com.example.Vi_vu_Viet.Repository.Trip.CompanyBookingSpecifications;
 import com.example.Vi_vu_Viet.Repository.Trip.BusCompanyRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.TicketRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.TripRepository;
 import com.example.Vi_vu_Viet.Service.Trip.CompanyBookingService;
 import com.example.Vi_vu_Viet.Util.ApplicationCode;
 import com.example.Vi_vu_Viet.Util.Enums.BookingStatus;
+import com.example.Vi_vu_Viet.Util.Enums.BookingViewStatus;
 import com.example.Vi_vu_Viet.Util.Enums.BusCompanyStatus;
 import com.example.Vi_vu_Viet.Util.Enums.TicketStatus;
 import com.example.Vi_vu_Viet.Util.Enums.TripStatus;
@@ -19,11 +22,14 @@ import com.example.Vi_vu_Viet.dto.Request.Booking.CompanyBookingFilter;
 import com.example.Vi_vu_Viet.dto.Response.BaseResponse;
 import com.example.Vi_vu_Viet.dto.Response.Booking.CompanyBookingResponse;
 import com.example.Vi_vu_Viet.dto.Response.Booking.CompanyBookingSummaryResponse;
+import com.example.Vi_vu_Viet.dto.Response.Booking.CompanyBookingStatisticsResponse;
+import com.example.Vi_vu_Viet.dto.Response.Booking.CompanyBookingStatusCountsResponse;
 import com.example.Vi_vu_Viet.dto.Response.PageResponse;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,8 +37,11 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.DateTimeException;
+import java.util.EnumMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -50,19 +59,53 @@ public class CompanyBookingServiceImpl implements CompanyBookingService {
 
     @Override
     @Transactional(readOnly = true)
+    public BaseResponse<CompanyBookingStatisticsResponse> getCompanyBookingStatistics(UUID companyId) {
+        BusCompany company = requireActiveCompany(companyId);
+        ZoneId zone;
+        try {
+            zone = ZoneId.of(StringUtils.hasText(company.getTimezone())
+                    ? company.getTimezone() : "Asia/Ho_Chi_Minh");
+        } catch (DateTimeException exception) {
+            throw badRequest("Company timezone is invalid");
+        }
+        LocalDate today = LocalDate.now(zone);
+        long todayBookings = bookingRepository.countDepartingBookings(companyId,
+                today.atStartOfDay(), today.plusDays(1).atStartOfDay());
+        var totals = ticketRepository.getConfirmedTotals(companyId);
+        return success(new CompanyBookingStatisticsResponse(today, zone.getId(), todayBookings,
+                totals.getTicketCount(), totals.getTotalAmount(), "VND"));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BaseResponse<CompanyBookingStatusCountsResponse> getCompanyBookingStatusCounts(
+            UUID companyId, CompanyBookingFilter filter) {
+        requireActiveCompany(companyId);
+        validateFilter(filter);
+        LocalDateTime now = LocalDateTime.now();
+        var base = CompanyBookingSpecifications.matching(companyId, filter, now, false);
+        var counts = new EnumMap<BookingViewStatus, Long>(BookingViewStatus.class);
+        for (BookingViewStatus view : BookingViewStatus.values()) {
+            counts.put(view, bookingRepository.count(base.and(CompanyBookingSpecifications.withView(view, now))));
+        }
+        long all = counts.values().stream().mapToLong(Long::longValue).sum();
+        return success(new CompanyBookingStatusCountsResponse(all, counts.get(BookingViewStatus.BOOKED),
+                counts.get(BookingViewStatus.PICKED_UP), counts.get(BookingViewStatus.COMPLETED),
+                counts.get(BookingViewStatus.NO_SHOW), counts.get(BookingViewStatus.CANCELLED),
+                counts.get(BookingViewStatus.HOLDING), counts.get(BookingViewStatus.EXPIRED)));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public BaseResponse<PageResponse<CompanyBookingSummaryResponse>> getCompanyBookings(
             UUID companyId, CompanyBookingFilter filter) {
         requireActiveCompany(companyId);
         validateFilter(filter);
-        String pattern = StringUtils.hasText(filter.getQ())
-                ? "%" + filter.getQ().trim().toLowerCase(Locale.ROOT)
-                    .replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%"
-                : null;
         LocalDateTime now = LocalDateTime.now();
-        var bookings = bookingRepository.searchByCompanyId(companyId, filter.getStatus(), filter.getTripId(),
-                filter.getRouteId(), filter.getCustomerId(), filter.getCreatedFrom(), filter.getCreatedTo(),
-                filter.getDepartureFrom(), filter.getDepartureTo(), pattern,
-                BookingStatus.HOLDING, BookingStatus.EXPIRED, now, PageRequest.of(filter.getPage(), filter.getSize()));
+        var bookings = bookingRepository.findAll(
+                CompanyBookingSpecifications.matching(companyId, filter, now, true),
+                PageRequest.of(filter.getPage(), filter.getSize(), Sort.by(
+                        Sort.Order.desc("created_at"), Sort.Order.desc("id"))));
         List<UUID> bookingIds = bookings.getContent().stream().map(Booking::getId).toList();
         Map<UUID, List<Ticket>> ticketsByBooking = bookingIds.isEmpty() ? Map.of()
                 : ticketRepository.findAllByBookingIds(bookingIds).stream()
@@ -153,8 +196,8 @@ public class CompanyBookingServiceImpl implements CompanyBookingService {
         }
     }
 
-    private void requireActiveCompany(UUID companyId) {
-        busCompanyRepository.findByIdAndStatus(companyId, BusCompanyStatus.ACTIVE)
+    private BusCompany requireActiveCompany(UUID companyId) {
+        return busCompanyRepository.findByIdAndStatus(companyId, BusCompanyStatus.ACTIVE)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Active bus company was not found"));
     }

@@ -6,11 +6,18 @@ import com.example.Vi_vu_Viet.dto.Request.Booking.CompanyBookingFilter;
 import com.example.Vi_vu_Viet.dto.Response.BaseResponse;
 import com.example.Vi_vu_Viet.dto.Response.Booking.CompanyBookingResponse;
 import com.example.Vi_vu_Viet.dto.Response.Booking.CompanyBookingSummaryResponse;
+import com.example.Vi_vu_Viet.dto.Response.Booking.CompanyBookingStatisticsResponse;
+import com.example.Vi_vu_Viet.dto.Response.Booking.CompanyBookingStatusCountsResponse;
 import com.example.Vi_vu_Viet.dto.Response.PageResponse;
 
 import java.util.UUID;
 
 public interface CompanyBookingService {
+    BaseResponse<CompanyBookingStatisticsResponse> getCompanyBookingStatistics(UUID companyId);
+
+    BaseResponse<CompanyBookingStatusCountsResponse> getCompanyBookingStatusCounts(
+            UUID companyId, CompanyBookingFilter filter);
+
     BaseResponse<PageResponse<CompanyBookingSummaryResponse>> getCompanyBookings(
             UUID companyId, CompanyBookingFilter filter);
 

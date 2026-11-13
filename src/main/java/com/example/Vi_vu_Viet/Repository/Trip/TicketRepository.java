@@ -16,6 +16,13 @@ import java.util.Optional;
 @Repository
 public interface TicketRepository extends JpaRepository<Ticket, UUID> {
 
+    @Query("select count(ticket) as ticketCount, coalesce(sum(ticket.fare_amount), 0) as totalAmount " +
+            "from Ticket ticket where ticket.company_id.id = :companyId " +
+            "and ticket.booking_id.company_id.id = :companyId " +
+            "and ticket.status = com.example.Vi_vu_Viet.Util.Enums.TicketStatus.CONFIRMED " +
+            "and ticket.booking_id.status = com.example.Vi_vu_Viet.Util.Enums.BookingStatus.CONFIRMED")
+    CompanyBookingTicketTotals getConfirmedTotals(@Param("companyId") UUID companyId);
+
     @Query("select count(ticket) from Ticket ticket where ticket.trip_id.id = :tripId")
     long countByTripId(@Param("tripId") UUID tripId);
 

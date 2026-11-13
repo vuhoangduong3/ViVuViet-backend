@@ -1,6 +1,8 @@
 package com.example.Vi_vu_Viet.dto.Response.Booking;
 
 import com.example.Vi_vu_Viet.Util.Enums.BookingStatus;
+import com.example.Vi_vu_Viet.Util.Enums.BookingViewStatus;
+import com.example.Vi_vu_Viet.Util.Enums.PassengerTripStatus;
 import com.example.Vi_vu_Viet.Util.Enums.TripStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AccessLevel;
@@ -38,6 +40,9 @@ public class CompanyBookingSummaryResponse {
     Long quotedTotalAmount;
     String currency;
     BookingStatus status;
+    BookingViewStatus viewStatus;
+    @Schema(description = "Trạng thái chung của đơn CONFIRMED; null nếu đơn đang giữ chỗ, hủy hoặc hết hạn")
+    PassengerTripStatus passengerTripStatus;
     LocalDateTime holdExpiresAt;
     LocalDateTime createdAt;
     LocalDateTime confirmedAt;

@@ -8,6 +8,8 @@ import com.example.Vi_vu_Viet.dto.Request.Booking.CompanyBookingFilter;
 import com.example.Vi_vu_Viet.dto.Response.BaseResponse;
 import com.example.Vi_vu_Viet.dto.Response.Booking.CompanyBookingResponse;
 import com.example.Vi_vu_Viet.dto.Response.Booking.CompanyBookingSummaryResponse;
+import com.example.Vi_vu_Viet.dto.Response.Booking.CompanyBookingStatisticsResponse;
+import com.example.Vi_vu_Viet.dto.Response.Booking.CompanyBookingStatusCountsResponse;
 import com.example.Vi_vu_Viet.dto.Response.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -46,8 +48,30 @@ public class CompanyBookingController {
 
     CompanyBookingService bookingService;
 
+    @Operation(summary = "Thống kê quản lý đơn",
+            description = "Số đơn khởi hành hôm nay theo múi giờ hãng (mọi trạng thái); số vé CONFIRMED " +
+                    "và tổng giá trị các vé đó trong đơn CONFIRMED trên toàn bộ thời gian. Không phải tiền thực thu.")
+    @GetMapping("/summary")
+    public BaseResponse<CompanyBookingStatisticsResponse> getCompanyBookingStatistics(
+            @PathVariable("company_id") UUID companyId
+    ) {
+        return bookingService.getCompanyBookingStatistics(companyId);
+    }
+
+    @Operation(summary = "Số đơn theo các tab trạng thái",
+            description = "Áp dụng cùng bộ lọc với danh sách nhưng bỏ viewStatus, không phân trang. " +
+                    "all gồm cả holding/expired, trả thêm hai số đếm này để đối chiếu tổng.")
+    @GetMapping("/status-counts")
+    public BaseResponse<CompanyBookingStatusCountsResponse> getCompanyBookingStatusCounts(
+            @PathVariable("company_id") UUID companyId,
+            @Valid @ModelAttribute @ParameterObject CompanyBookingFilter filter
+    ) {
+        return bookingService.getCompanyBookingStatusCounts(companyId, filter);
+    }
+
     @Operation(summary = "Danh sách đơn đặt vé toàn hãng",
             description = "Tìm kiếm, lọc và phân trang; sắp xếp đơn mới nhất trước. " +
+                    "Lọc driverId, viewStatus hoặc passengerTripStatus theo trạng thái chung của đơn. " +
                     "Đơn giữ ghế quá hạn được tính là EXPIRED ngay trong bộ lọc và response.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Trang đơn đặt vé của hãng"),
@@ -62,7 +86,9 @@ public class CompanyBookingController {
     }
 
     @Operation(summary = "Chi tiết đơn đặt vé của hãng",
-            description = "Gồm liên hệ, chuyến, tuyến, toàn bộ vé/hành khách, ghế, địa chỉ đón/trả và giá đã đặt.")
+            description = "Gồm liên hệ, chuyến, tuyến, toàn bộ vé/hành khách, ghế, địa chỉ đón/trả, giá đã đặt, " +
+                    "phân công tài xế/xe hiện tại, trạng thái chung và lịch sử các mốc đã biết. " +
+                    "historyComplete=false khi dữ liệu thiếu thời điểm; không suy đoán giờ không lên xe.")
     @ApiResponse(responseCode = "200", description = "Chi tiết đơn đặt vé")
     @GetMapping("/{booking_id}")
     public BaseResponse<CompanyBookingResponse> getCompanyBooking(

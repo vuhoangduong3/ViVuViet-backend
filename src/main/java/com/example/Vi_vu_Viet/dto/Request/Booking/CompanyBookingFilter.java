@@ -1,6 +1,8 @@
 package com.example.Vi_vu_Viet.dto.Request.Booking;
 
 import com.example.Vi_vu_Viet.Util.Enums.BookingStatus;
+import com.example.Vi_vu_Viet.Util.Enums.BookingViewStatus;
+import com.example.Vi_vu_Viet.Util.Enums.PassengerTripStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -20,6 +22,12 @@ public class CompanyBookingFilter {
     @Schema(description = "Tìm mã đơn/vé/chuyến/tuyến, tên tuyến, liên hệ hoặc hành khách")
     String q;
     BookingStatus status;
+    @Schema(description = "Tab quản lý đơn; bỏ trống để lấy tất cả. HOLDING/EXPIRED dùng cho đơn chưa xác nhận.")
+    BookingViewStatus viewStatus;
+    @Schema(description = "Trạng thái hành trình chung của đơn, chỉ áp dụng cho đơn CONFIRMED")
+    PassengerTripStatus passengerTripStatus;
+    @Schema(description = "ID tài khoản tài xế đang được phân công; bỏ phân công REJECTED/REPLACED")
+    UUID driverId;
     UUID tripId;
     UUID routeId;
     UUID customerId;
