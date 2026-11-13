@@ -43,6 +43,7 @@ import com.example.Vi_vu_Viet.dto.Request.Trip.CancelTripRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.UpdateTripRequest;
 import com.example.Vi_vu_Viet.dto.Response.BaseResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripResponse;
+import com.example.Vi_vu_Viet.dto.Response.Trip.CreateTripResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripDetailResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripAssignmentResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripPassengerBookingResponse;
@@ -235,7 +236,7 @@ public class TripServiceImpl implements TripService {
 
     @Override
     @Transactional
-    public BaseResponse<TripResponse> createTrip(UUID companyId, CreateTripRequest request, UserAccount actor) {
+    public BaseResponse<CreateTripResponse> createTrip(UUID companyId, CreateTripRequest request, UserAccount actor) {
         BusCompany company = getActiveCompany(companyId);
         Route route = getActiveCompanyRoute(companyId, request.getRouteId());
         LocalDateTime bookingCutoffAt = request.getBookingCutoffAt() == null
@@ -252,6 +253,7 @@ public class TripServiceImpl implements TripService {
         trip.setDeparture_at(request.getDepartureAt());
         trip.setExpected_arrival_at(request.getExpectedArrivalAt());
         trip.setBooking_cutoff_at(bookingCutoffAt);
+        trip.setDriver_wage(request.getDriverWage());
         trip.setStatus(TripStatus.DRAFT);
         trip.setSales_status(TripSalesStatus.CLOSED);
         trip.setCreated_by(actor == null ? null : userRepository.findById(actor.getId())
@@ -260,7 +262,9 @@ public class TripServiceImpl implements TripService {
 
         tripRepository.saveAndFlush(trip);
         tripHistoryRecorder.record(trip, Type.CREATED, null, trip.getCreated_at(), trip.getCreated_by());
-        return success(tripResponseMapper.toTripResponse(trip));
+        CreateTripResponse response = tripResponseMapper.populateTripResponse(trip, new CreateTripResponse());
+        response.setDriverWage(trip.getDriver_wage());
+        return success(response);
     }
 
     @Override

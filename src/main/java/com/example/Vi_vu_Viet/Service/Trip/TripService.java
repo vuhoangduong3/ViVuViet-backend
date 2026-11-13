@@ -10,6 +10,7 @@ import com.example.Vi_vu_Viet.dto.Response.BaseResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripAssignmentResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripPassengerBookingResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripResponse;
+import com.example.Vi_vu_Viet.dto.Response.Trip.CreateTripResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripDetailResponse;
 
 import java.time.LocalDate;
@@ -36,7 +37,7 @@ public interface TripService {
     BaseResponse<TripAssignmentResponse> assignTrip(UUID companyId, UUID tripId, AssignTripRequest request,
                                                     UserAccount actor);
 
-    BaseResponse<TripResponse> createTrip(UUID companyId, CreateTripRequest request, UserAccount actor);
+    BaseResponse<CreateTripResponse> createTrip(UUID companyId, CreateTripRequest request, UserAccount actor);
 
     BaseResponse<TripDetailResponse> getCompanyTrip(UUID companyId, UUID tripId);
 

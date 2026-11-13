@@ -30,4 +30,7 @@ public interface DashboardService {
 
     BaseResponse<RevenueReportResponse> getRevenue(UUID companyId, LocalDate from, LocalDate to,
                                                     TicketStatus status);
+
+    BaseResponse<RevenueReportResponse> getRevenue(UUID companyId, LocalDate from, LocalDate to,
+                                                    TicketStatus status, UUID routeId);
 }

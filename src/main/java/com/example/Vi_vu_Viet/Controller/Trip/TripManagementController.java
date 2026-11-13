@@ -9,6 +9,7 @@ import com.example.Vi_vu_Viet.dto.Request.Trip.CancelTripRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.UpdateTripRequest;
 import com.example.Vi_vu_Viet.dto.Response.BaseResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripResponse;
+import com.example.Vi_vu_Viet.dto.Response.Trip.CreateTripResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripDetailResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripAssignmentResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripPassengerBookingResponse;
@@ -154,7 +155,7 @@ public class TripManagementController {
             @ApiResponse(responseCode = "404", description = "Không tìm thấy hãng hoặc tuyến của hãng")
     })
     @PostMapping
-    public BaseResponse<TripResponse> createTrip(
+    public BaseResponse<CreateTripResponse> createTrip(
             @Parameter(description = "ID hãng xe")
             @PathVariable("company_id") UUID companyId,
             @Valid @RequestBody BaseRequest<CreateTripRequest> request,

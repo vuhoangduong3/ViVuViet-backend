@@ -1,6 +1,11 @@
 package com.example.Vi_vu_Viet.Controller.Trip;
 
 import com.example.Vi_vu_Viet.Service.Trip.DashboardService;
+import com.example.Vi_vu_Viet.Service.Trip.Implement.RevenueAnalyticsService;
+import com.example.Vi_vu_Viet.Util.ApplicationCode;
+import com.example.Vi_vu_Viet.dto.Response.Company.RevenueAnalyticsResponse;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import com.example.Vi_vu_Viet.Util.Enums.TicketStatus;
 import com.example.Vi_vu_Viet.dto.Response.BaseResponse;
 import com.example.Vi_vu_Viet.dto.Response.Company.DashboardDriverResponse;
@@ -37,6 +42,7 @@ import java.util.UUID;
 public class DashboardController {
 
     DashboardService dashboardService;
+    RevenueAnalyticsService revenueAnalyticsService;
 
     @Operation(summary = "KPI tổng quan của hãng",
             description = "Mặc định 14 ngày gồm hôm nay theo múi giờ hãng. Có kỳ trước cùng số ngày và " +
@@ -132,8 +138,39 @@ public class DashboardController {
             @RequestParam(name = "to", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @Parameter(description = "Trạng thái vé; mặc định CONFIRMED")
-            @RequestParam(name = "status", required = false) TicketStatus status
+            @RequestParam(name = "status", required = false) TicketStatus status,
+            @RequestParam(name = "route_id", required = false) UUID routeId
     ) {
-        return dashboardService.getRevenue(companyId, from, to, status);
+        return dashboardService.getRevenue(companyId, from, to, status, routeId);
+    }
+
+    @GetMapping("/reports/revenue/by-route")
+    @Operation(summary = "Thực thu theo tuyến và ngày khởi hành")
+    public BaseResponse<List<RevenueAnalyticsResponse.Route>> getRevenueByRoute(
+            @PathVariable("company_id") UUID companyId,
+            @RequestParam(name = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(name = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(name = "route_id", required = false) UUID routeId) {
+        var report = dashboardService.getRevenue(companyId, from, to, null, routeId).getWsResponse();
+        BaseResponse<List<RevenueAnalyticsResponse.Route>> response = new BaseResponse<>(ApplicationCode.SUCCESS);
+        response.setWsResponse(report.getAnalytics().routes());
+        return response;
+    }
+
+    @GetMapping("/reports/revenue/reconciliation")
+    @Operation(summary = "Đối soát thực thu theo chuyến")
+    public BaseResponse<RevenueAnalyticsResponse.Reconciliation> getReconciliation(
+            @PathVariable("company_id") UUID companyId,
+            @RequestParam(name = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(name = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(name = "route_id", required = false) UUID routeId,
+            @RequestParam(name = "limit", defaultValue = "6") int limit) {
+        if (limit < 1 || limit > 100) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "limit must be between 1 and 100");
+        var report = dashboardService.getRevenue(companyId, from, to, null, routeId).getWsResponse();
+        var result = limit == 6 ? report.getAnalytics().reconciliation()
+                : revenueAnalyticsService.calculate(companyId, report.getFrom(), report.getTo(), routeId, limit).reconciliation();
+        BaseResponse<RevenueAnalyticsResponse.Reconciliation> response = new BaseResponse<>(ApplicationCode.SUCCESS);
+        response.setWsResponse(result);
+        return response;
     }
 }

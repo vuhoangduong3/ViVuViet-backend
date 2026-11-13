@@ -1,6 +1,7 @@
 package com.example.Vi_vu_Viet.Repository.Trip;
 
 import com.example.Vi_vu_Viet.Entity.Trip.Trip;
+import com.example.Vi_vu_Viet.Entity.Trip.Ticket;
 import com.example.Vi_vu_Viet.Util.Enums.TicketStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.domain.Pageable;
@@ -15,6 +16,36 @@ import java.util.UUID;
 
 @Repository
 public interface DashboardRepository extends JpaRepository<Trip, UUID> {
+
+    @Query("select trip from Trip trip join fetch trip.route_id route " +
+            "where trip.company_id.id = :companyId and trip.departure_at >= :fromAt " +
+            "and trip.departure_at < :toAt and (:routeId is null or route.id = :routeId) " +
+            "and trip.status <> com.example.Vi_vu_Viet.Util.Enums.TripStatus.DRAFT " +
+            "order by trip.departure_at desc, trip.id desc")
+    List<Trip> findReportTrips(@Param("companyId") UUID companyId, @Param("fromAt") LocalDateTime fromAt,
+                               @Param("toAt") LocalDateTime toAt, @Param("routeId") UUID routeId);
+
+    @Query("select ticket from Ticket ticket join fetch ticket.trip_id trip " +
+            "join fetch ticket.booking_id booking where ticket.company_id.id = :companyId " +
+            "and trip.company_id.id = :companyId and trip.departure_at >= :fromAt " +
+            "and trip.departure_at < :toAt and (:routeId is null or trip.route_id.id = :routeId) " +
+            "and trip.status <> com.example.Vi_vu_Viet.Util.Enums.TripStatus.DRAFT")
+    List<Ticket> findReportTickets(@Param("companyId") UUID companyId, @Param("fromAt") LocalDateTime fromAt,
+                                   @Param("toAt") LocalDateTime toAt, @Param("routeId") UUID routeId);
+
+    @Query("select count(ticket), coalesce(sum(ticket.fare_amount), 0) from Ticket ticket " +
+            "where ticket.company_id.id = :companyId and ticket.status = :status and ticket.trip_id.route_id.id = :routeId " +
+            "and ticket.trip_id.departure_at >= :fromAt and ticket.trip_id.departure_at < :toAt")
+    List<Object[]> getRouteRevenueSummary(@Param("companyId") UUID companyId, @Param("fromAt") LocalDateTime fromAt,
+            @Param("toAt") LocalDateTime toAt, @Param("status") TicketStatus status, @Param("routeId") UUID routeId);
+
+    @Query("select extract(year from trip.departure_at), extract(month from trip.departure_at), " +
+            "extract(day from trip.departure_at), count(ticket), coalesce(sum(ticket.fare_amount), 0) " +
+            "from Ticket ticket join ticket.trip_id trip where ticket.company_id.id = :companyId and ticket.status = :status " +
+            "and trip.route_id.id = :routeId and trip.departure_at >= :fromAt and trip.departure_at < :toAt " +
+            "group by extract(year from trip.departure_at), extract(month from trip.departure_at), extract(day from trip.departure_at)")
+    List<Object[]> getRouteRevenueByDepartureDate(@Param("companyId") UUID companyId, @Param("fromAt") LocalDateTime fromAt,
+            @Param("toAt") LocalDateTime toAt, @Param("status") TicketStatus status, @Param("routeId") UUID routeId);
 
     @Query("select count(trip), " +
             "sum(case when trip.status = com.example.Vi_vu_Viet.Util.Enums.TripStatus.SCHEDULED then 1 else 0 end), " +

@@ -3,6 +3,7 @@ package com.example.Vi_vu_Viet.dto.Request.Trip;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
 import lombok.Data;
@@ -35,4 +36,8 @@ public class CreateTripRequest {
 
     @Schema(description = "Thời điểm ngừng nhận đặt chỗ; mặc định trước giờ khởi hành 30 phút")
     LocalDateTime bookingCutoffAt;
+
+    @PositiveOrZero(message = "Tiền công tài xế không được âm")
+    @Schema(description = "Tiền công tài xế theo chuyến, đơn vị VND; null nếu chưa nhập", example = "400000")
+    Long driverWage;
 }

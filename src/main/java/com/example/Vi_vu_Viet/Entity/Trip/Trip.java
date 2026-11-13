@@ -64,6 +64,9 @@ public class Trip extends BaseEntity {
 
     LocalDateTime booking_cutoff_at;
 
+    @Column(name = "driver_wage")
+    Long driver_wage;
+
     @Enumerated(EnumType.STRING)
     TripStatus status;
 

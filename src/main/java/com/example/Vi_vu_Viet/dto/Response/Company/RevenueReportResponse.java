@@ -27,4 +27,5 @@ public class RevenueReportResponse {
     Boolean actualCollected;
     String note;
     List<RevenuePeriodResponse> periods;
+    RevenueAnalyticsResponse analytics;
 }

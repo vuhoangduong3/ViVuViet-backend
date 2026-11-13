@@ -62,6 +62,7 @@ public class DashboardServiceImpl implements DashboardService {
     DashboardRepository dashboardRepository;
     BusCompanyRepository busCompanyRepository;
     TripIncidentRepository tripIncidentRepository;
+    RevenueAnalyticsService revenueAnalyticsService;
 
     @Override
     @Transactional(readOnly = true)
@@ -176,15 +177,23 @@ public class DashboardServiceImpl implements DashboardService {
     @Transactional(readOnly = true)
     public BaseResponse<RevenueReportResponse> getRevenue(UUID companyId, LocalDate from, LocalDate to,
                                                            TicketStatus status) {
+        return getRevenue(companyId, from, to, status, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BaseResponse<RevenueReportResponse> getRevenue(UUID companyId, LocalDate from, LocalDate to,
+                                                           TicketStatus status, UUID routeId) {
         DateRange range = dashboardRange(from, to, companyZone(companyId));
         validateDailyRange(range);
         DateRange previous = range.previous();
         TicketStatus selectedStatus = status == null ? TicketStatus.CONFIRMED : status;
         LocalDateTime fromAt = range.fromAt();
         LocalDateTime toAt = range.toAt();
-        Object[] totals = dashboardRepository.getRevenueSummary(companyId, fromAt, toAt, selectedStatus).get(0);
-        Object[] previousTotals = dashboardRepository.getRevenueSummary(
-                companyId, previous.fromAt(), previous.toAt(), selectedStatus).get(0);
+        Object[] totals = (routeId == null ? dashboardRepository.getRevenueSummary(companyId, fromAt, toAt, selectedStatus)
+                : dashboardRepository.getRouteRevenueSummary(companyId, fromAt, toAt, selectedStatus, routeId)).get(0);
+        Object[] previousTotals = (routeId == null ? dashboardRepository.getRevenueSummary(companyId, previous.fromAt(), previous.toAt(), selectedStatus)
+                : dashboardRepository.getRouteRevenueSummary(companyId, previous.fromAt(), previous.toAt(), selectedStatus, routeId)).get(0);
         Map<LocalDate, RevenuePeriodResponse> periods = new LinkedHashMap<>();
         for (LocalDate date = range.from(); !date.isAfter(range.to()); date = date.plusDays(1)) {
             RevenuePeriodResponse period = new RevenuePeriodResponse();
@@ -193,7 +202,8 @@ public class DashboardServiceImpl implements DashboardService {
             period.setTicketValue(0L);
             periods.put(date, period);
         }
-        for (Object[] row : dashboardRepository.getRevenueByDepartureDate(companyId, fromAt, toAt, selectedStatus)) {
+        for (Object[] row : routeId == null ? dashboardRepository.getRevenueByDepartureDate(companyId, fromAt, toAt, selectedStatus)
+                : dashboardRepository.getRouteRevenueByDepartureDate(companyId, fromAt, toAt, selectedStatus, routeId)) {
             RevenuePeriodResponse period = toRevenuePeriod(row);
             periods.put(period.getDate(), period);
         }
@@ -214,6 +224,7 @@ public class DashboardServiceImpl implements DashboardService {
         response.setActualCollected(false);
         response.setNote("Báo cáo giá trị vé theo trạng thái và ngày khởi hành; không thể hiện tiền thực thu vì chưa tích hợp thanh toán.");
         response.setPeriods(new ArrayList<>(periods.values()));
+        response.setAnalytics(revenueAnalyticsService.calculate(companyId, range.from(), range.to(), routeId, 6));
         return success(response);
     }
 

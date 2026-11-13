@@ -125,6 +125,45 @@ Các API danh sách, chi tiết, tạo và cập nhật tuyến tại `/api/v1/b
 
 API đặt vé yêu cầu đăng nhập. Ghế được giữ trong 5 phút; khách cần xác nhận trước khi hết hạn. Thanh toán chưa được tích hợp.
 
+API tạo chuyến `POST /api/v1/bus-companies/{company_id}/trips` nhận thêm
+`driverWage` trong `wsRequest`: tiền công tài xế của chuyến, số nguyên VND không âm,
+ví dụ `"driverWage": 400000`. Trường này tùy chọn; bỏ qua hoặc gửi `null` nghĩa là
+chưa nhập, còn `0` là mức công bằng 0. Response tạo chuyến trả thêm `driverWage`.
+Tiền công được lưu trên `trips.driver_wage`; các chuyến cũ giữ `null`. Cấu hình
+`spring.jpa.hibernate.ddl-auto=update` hiện tại sẽ bổ sung cột khi ứng dụng khởi động.
+
+### Báo cáo thực thu và đối soát
+
+Các API sau yêu cầu quyền `COMPANY_ADMIN` tại hãng; tiền tố là
+`/api/v1/bus-companies/{company_id}`. Tham số `from`, `to` dùng định dạng
+`yyyy-MM-dd`, tính cả hai ngày theo ngày khởi hành dự kiến của chuyến; `route_id`
+là UUID tuyến tùy chọn. Mặc định là 14 ngày và tối đa 3660 ngày. Kỳ trước là
+khoảng liền trước có cùng số ngày. Chuyến nháp không thuộc thống kê thực thu.
+Các chuyến khác, kể cả chuyến chưa khởi hành hoặc đã hủy, đều được tính vào
+tiền công trong kỳ theo ngày khởi hành. Tham số `status` của API báo cáo cũ chỉ
+áp dụng cho các trường giá trị vé cũ, không lọc các chỉ số trong `analytics`.
+
+`GET /reports/revenue` giữ nguyên các trường báo cáo giá trị vé hiện có, thêm
+`analytics` gồm:
+
+- `collectedRevenue`, `previousCollectedRevenue`, `collectedRevenueChangePct`: thực thu kỳ này, kỳ trước và phần trăm thay đổi; phần trăm là null khi kỳ trước bằng 0 và kỳ này khác 0.
+- `bookedTickets`, `collectedTickets`, `collectionRate`: vé đã xác nhận đặt, vé có xác nhận thu tiền và tỷ lệ phần trăm. Vé đã xác nhận đặt rồi hủy vẫn nằm trong tổng vé đặt; giữ chỗ chưa xác nhận không tính.
+- `cancelledTickets`, `noShowTickets`: vé có trạng thái hủy và vé được đánh dấu không lên xe.
+- `completedTrips`, `departedTrips`: chuyến hoàn thành và chuyến có thời điểm khởi hành thực tế.
+- `driverWages`, `missingDriverWages`, `estimatedProfit`: tổng tiền công và lãi tạm tính (`collectedRevenue - driverWages`). Hai giá trị tiền là null nếu ít nhất một chuyến trong kỳ chưa có tiền công; `missingDriverWages` là số chuyến thiếu.
+- `days[]`: `date`, `collectedRevenue`, trả đủ các ngày trong kỳ; tiền được tính vào ngày chuyến khởi hành, kể cả khi tài xế xác nhận thu vào ngày khác.
+- `routes[]` và `reconciliation`: cùng cấu trúc với hai API bên dưới; `reconciliation` mặc định gồm tối đa 6 chuyến.
+
+`GET /reports/revenue/by-route` trả mảng `routeId`, `routeName`, `collectedRevenue`
+sắp theo thực thu giảm dần. `GET /reports/revenue/reconciliation` nhận thêm `limit`
+từ 1 đến 100, mặc định 6, trả `trips[]` mới nhất theo giờ khởi hành. Mỗi dòng có
+`tripId`, `tripCode`, `routeId`, `routeName`, `departureAt`, `bookedTickets`,
+`collectedTickets`, `expectedRevenue`, `collectedRevenue`, `driverWage`, `difference`.
+`expectedRevenue` là tổng giá snapshot của các vé đã xác nhận thu, `difference` là
+thực thu trừ tổng giá đó. `mismatchedTrips` đếm dòng có chênh lệch khác 0; `totals`
+tổng hợp các dòng trả về. Tổng tiền công là null nếu có dòng chưa nhập công.
+Các khoản thu đã xác nhận vẫn được giữ khi vé sau đó bị hủy; hiện chưa có luồng hoàn tiền.
+
 ### Danh sách chuyến theo nhóm trạng thái của hãng
 
 Bốn API yêu cầu Bearer token và quyền `COMPANY_ADMIN` của đúng hãng trong URL.
