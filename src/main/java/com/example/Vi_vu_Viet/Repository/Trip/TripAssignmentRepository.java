@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -20,6 +21,11 @@ import java.util.List;
 
 @Repository
 public interface TripAssignmentRepository extends JpaRepository<TripAssignment, UUID> {
+
+    @Modifying
+    @Query("delete from TripAssignment assignment where assignment.company_id.id = :companyId " +
+            "and assignment.trip_id.id = :tripId")
+    int deleteByCompanyAndTrip(@Param("companyId") UUID companyId, @Param("tripId") UUID tripId);
 
     @EntityGraph(attributePaths = {"trip_id", "trip_id.route_id"})
     @Query("select assignment from TripAssignment assignment " +

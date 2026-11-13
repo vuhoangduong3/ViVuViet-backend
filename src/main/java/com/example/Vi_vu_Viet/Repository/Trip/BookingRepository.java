@@ -138,6 +138,12 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @Query("select count(booking) from Booking booking where booking.trip_id.id = :tripId")
     long countByTripId(@Param("tripId") UUID tripId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select booking from Booking booking where booking.company_id.id = :companyId " +
+            "and booking.trip_id.id = :tripId order by booking.id")
+    List<Booking> findAllForCompanyTripForUpdate(@Param("companyId") UUID companyId,
+                                                 @Param("tripId") UUID tripId);
+
     @Query("select count(booking) from Booking booking where booking.company_id.id = :companyId " +
             "and lower(booking.booking_code) = lower(:bookingCode)")
     long countByCompanyIdAndBookingCode(

@@ -63,6 +63,13 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
             @Param("tripId") UUID tripId
     );
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select trip from Trip trip where trip.id = :tripId " +
+            "and exists (select assignment.id from TripAssignment assignment " +
+            "where assignment.trip_id = trip and assignment.driver_user_id.id = :driverId)")
+    Optional<Trip> findByIdAndDriverIdForUpdate(@Param("tripId") UUID tripId,
+                                               @Param("driverId") UUID driverId);
+
     @Query("select count(trip) from Trip trip " +
             "where trip.company_id.id = :companyId and lower(trip.trip_code) = lower(:tripCode)")
     long countByCompanyIdAndTripCode(

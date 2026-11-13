@@ -125,6 +125,30 @@ Các API danh sách, chi tiết, tạo và cập nhật tuyến tại `/api/v1/b
 
 API đặt vé yêu cầu đăng nhập. Ghế được giữ trong 5 phút; khách cần xác nhận trước khi hết hạn. Thanh toán chưa được tích hợp.
 
+### Hủy và xóa chuyến của hãng
+
+Hai API yêu cầu Bearer token và quyền `COMPANY_ADMIN` của hãng trong URL:
+
+| Method | URL | Kết quả |
+| --- | --- | --- |
+| POST | `/api/v1/bus-companies/{company_id}/trips/{trip_id}/cancel` | Hủy chuyến chưa bắt đầu; trả `TripResponse` trong `wsResponse` |
+| DELETE | `/api/v1/bus-companies/{company_id}/trips/{trip_id}` | Xóa chuyến nháp; trả envelope thành công với `wsResponse: null` |
+
+Body hủy chuyến:
+
+```json
+{
+  "wsRequest": {
+    "reason": "Xe gặp sự cố",
+    "description": "Không bố trí được xe thay thế trước giờ khởi hành."
+  }
+}
+```
+
+`reason` bắt buộc, tối đa 500 ký tự; `description` tùy chọn, tối đa 2000 ký tự. Chỉ hủy chuyến `DRAFT` hoặc `SCHEDULED` chưa có giờ khởi hành thực tế; các trạng thái đang chạy/đã kết thúc trả `409`. Chuyến chuyển sang `CANCELLED`, đóng bán (`CLOSED`), lưu `cancelledAt`, `cancellationReason`, `cancellationDescription` trong response. Đặt chỗ/vé `HOLDING` còn hạn và `CONFIRMED` chuyển sang `CANCELLED`; giữ chỗ quá hạn chuyển sang `EXPIRED`. Lịch sử vé/đặt chỗ, phân công và ghế vẫn giữ nguyên; chưa có xử lý hoàn tiền. Gọi lại API hủy cho chuyến đã hủy trả kết quả hiện có, không ghi đè lý do hoặc thời điểm hủy ban đầu.
+
+API xóa không cần body, chỉ cho phép chuyến `DRAFT` đang đóng bán, chưa có bất kỳ lịch sử đặt chỗ/vé (kể cả đã hủy hoặc hết hạn) hoặc sự cố nào. Khi xóa, BE dọn phân công và ghế chụp trước khi xóa chuyến; các trường hợp không đủ điều kiện trả `409`. Hãng không hoạt động hoặc chuyến không thuộc hãng trả `404`; không có quyền quản lý hãng trả `403`. Hủy chuyến giữ nguyên `tripCount` của tuyến; xóa chuyến làm giảm số đếm này. FE cần làm mới cache tuyến và chuyến sau thao tác, đồng thời làm mới dữ liệu đặt vé nếu hủy chuyến.
+
 ### Luồng API đặt vé
 
 Admin hãng cấu hình sơ đồ ghế cho xe bằng `PUT /api/v1/bus-companies/{company_id}/vehicles/{vehicle_id}/seats`, xem bằng `GET` cùng URL. Xe chưa cấu hình trả `seatLayoutId: null` và `seats: []`. Mỗi lần lưu tạo một phiên bản sơ đồ mới và cập nhật `passengerCapacity` bằng số ghế. Sau đó tạo chuyến nháp, phân xe và tài xế qua `PUT /api/v1/bus-companies/{company_id}/trips/{trip_id}/assignments`, rồi mở bán chuyến. Endpoint cấu hình ghế theo chuyến đã được bỏ. Khách xem ghế tại `GET /api/v1/trips/{trip_id}/seats`, tạo đặt vé bằng `POST /api/v1/me/bookings`, rồi xác nhận tại `POST /api/v1/me/bookings/{booking_id}/confirm`. Có thể xem danh sách/chi tiết tại `GET /api/v1/me/bookings` và `GET /api/v1/me/bookings/{booking_id}`, hoặc hủy bằng `POST /api/v1/me/bookings/{booking_id}/cancel`.

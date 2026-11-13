@@ -5,6 +5,7 @@ import com.example.Vi_vu_Viet.Service.Trip.TripService;
 import com.example.Vi_vu_Viet.dto.Request.BaseRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.AssignTripRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.CreateTripRequest;
+import com.example.Vi_vu_Viet.dto.Request.Trip.CancelTripRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.UpdateTripRequest;
 import com.example.Vi_vu_Viet.dto.Response.BaseResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripResponse;
@@ -22,6 +23,7 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -161,6 +163,44 @@ public class TripManagementController {
             @Valid @RequestBody BaseRequest<UpdateTripRequest> request
     ) {
         return tripService.updateTrip(companyId, tripId, request.getWsRequest());
+    }
+
+    @Operation(summary = "Hủy chuyến chưa bắt đầu",
+            description = "Hủy chuyến DRAFT hoặc SCHEDULED, đóng bán vé và hủy các đặt chỗ/vé còn hiệu lực. " +
+                    "Giữ lịch sử, lý do và thời điểm hủy; gọi lại không thay đổi thông tin hủy ban đầu.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Chuyến đã hủy, trả TripResponse"),
+            @ApiResponse(responseCode = "400", description = "Thiếu lý do hoặc dữ liệu hủy không hợp lệ"),
+            @ApiResponse(responseCode = "401", description = "Chưa đăng nhập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền quản lý hãng này"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy hãng đang hoạt động hoặc chuyến trong hãng"),
+            @ApiResponse(responseCode = "409", description = "Chuyến đã bắt đầu hoặc đã kết thúc")
+    })
+    @PostMapping("/{trip_id}/cancel")
+    public BaseResponse<TripResponse> cancelTrip(
+            @PathVariable("company_id") UUID companyId,
+            @PathVariable("trip_id") UUID tripId,
+            @Valid @RequestBody BaseRequest<CancelTripRequest> request
+    ) {
+        return tripService.cancelTrip(companyId, tripId, request.getWsRequest());
+    }
+
+    @Operation(summary = "Xóa chuyến nháp",
+            description = "Chỉ xóa chuyến DRAFT đang đóng bán, chưa có bất kỳ đặt vé, vé hoặc sự cố nào. " +
+                    "Xóa cả phân công và ghế chụp của chuyến. Chuyến đã mở bán cần dùng API hủy để giữ lịch sử.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Xóa thành công; wsResponse bằng null"),
+            @ApiResponse(responseCode = "401", description = "Chưa đăng nhập"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền quản lý hãng này"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy hãng đang hoạt động hoặc chuyến trong hãng"),
+            @ApiResponse(responseCode = "409", description = "Chuyến không còn là nháp hoặc đã có lịch sử")
+    })
+    @DeleteMapping("/{trip_id}")
+    public BaseResponse<Void> deleteTrip(
+            @PathVariable("company_id") UUID companyId,
+            @PathVariable("trip_id") UUID tripId
+    ) {
+        return tripService.deleteTrip(companyId, tripId);
     }
 
     @Operation(

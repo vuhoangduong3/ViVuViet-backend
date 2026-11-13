@@ -53,6 +53,15 @@ public class TripResponse {
 
     TripSalesStatus salesStatus;
 
+    @Schema(description = "Thời điểm hãng hủy chuyến")
+    LocalDateTime cancelledAt;
+
+    @Schema(description = "Lý do hãng hủy chuyến")
+    String cancellationReason;
+
+    @Schema(description = "Mô tả thêm về việc hủy chuyến")
+    String cancellationDescription;
+
     LocalDateTime createdAt;
 
     LocalDateTime updatedAt;

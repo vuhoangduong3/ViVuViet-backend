@@ -16,6 +16,9 @@ import java.util.Optional;
 @Repository
 public interface TicketRepository extends JpaRepository<Ticket, UUID> {
 
+    @Query("select count(ticket) from Ticket ticket where ticket.trip_id.id = :tripId")
+    long countByTripId(@Param("tripId") UUID tripId);
+
     @EntityGraph(attributePaths = "trip_seat_id")
     @Query("select ticket from Ticket ticket where ticket.booking_id.id = :bookingId " +
             "order by ticket.created_at, ticket.id")

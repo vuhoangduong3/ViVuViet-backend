@@ -29,6 +29,9 @@ public class TripResponseMapper {
         response.setBaseFareAmount(trip.getRoute_id().getBase_fare_amount());
         response.setStatus(trip.getStatus());
         response.setSalesStatus(trip.getSales_status());
+        response.setCancelledAt(trip.getCancelled_at());
+        response.setCancellationReason(trip.getCancellation_reason());
+        response.setCancellationDescription(trip.getCancellation_description());
         response.setCreatedAt(trip.getCreated_at());
         response.setUpdatedAt(trip.getUpdated_at());
         return response;

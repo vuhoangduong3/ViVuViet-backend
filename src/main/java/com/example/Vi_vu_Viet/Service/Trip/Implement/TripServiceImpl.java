@@ -15,6 +15,7 @@ import com.example.Vi_vu_Viet.Repository.Trip.BusCompanyRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.RouteRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.TripRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.TripSeatRepository;
+import com.example.Vi_vu_Viet.Repository.Trip.TripIncidentRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.TripAssignmentRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.BookingRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.TicketRepository;
@@ -37,6 +38,7 @@ import com.example.Vi_vu_Viet.Util.Enums.TicketStatus;
 import com.example.Vi_vu_Viet.Util.Enums.VehicleStatus;
 import com.example.Vi_vu_Viet.dto.Request.Trip.AssignTripRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.CreateTripRequest;
+import com.example.Vi_vu_Viet.dto.Request.Trip.CancelTripRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.UpdateTripRequest;
 import com.example.Vi_vu_Viet.dto.Response.BaseResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripResponse;
@@ -79,6 +81,7 @@ public class TripServiceImpl implements TripService {
     DriverProfileRepository driverProfileRepository;
     VehicleRepository vehicleRepository;
     SeatLayoutSeatRepository seatLayoutSeatRepository;
+    TripIncidentRepository tripIncidentRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -291,6 +294,74 @@ public class TripServiceImpl implements TripService {
         trip.setStatus(TripStatus.SCHEDULED);
         trip.setSales_status(TripSalesStatus.OPEN);
         return success(tripResponseMapper.toTripResponse(tripRepository.save(trip)));
+    }
+
+    @Override
+    @Transactional
+    public BaseResponse<TripResponse> cancelTrip(UUID companyId, UUID tripId, CancelTripRequest request) {
+        getActiveCompany(companyId);
+        Trip trip = tripRepository.findByIdAndCompanyIdForUpdate(companyId, tripId)
+                .orElseThrow(() -> notFound("Trip was not found for this company"));
+        if (trip.getStatus() == TripStatus.CANCELLED) {
+            return success(tripResponseMapper.toTripResponse(trip));
+        }
+        if ((trip.getStatus() != TripStatus.DRAFT && trip.getStatus() != TripStatus.SCHEDULED)
+                || trip.getActual_departure_at() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only trips that have not started can be cancelled");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        // Khóa đặt chỗ để không chạy đồng thời với xác nhận hoặc hủy vé của khách.
+        List<Booking> bookings = bookingRepository.findAllForCompanyTripForUpdate(companyId, tripId);
+        for (Booking booking : bookings) {
+            if (booking.getStatus() == BookingStatus.HOLDING && !booking.getHold_expires_at().isAfter(now)) {
+                booking.setStatus(BookingStatus.EXPIRED);
+            } else if (booking.getStatus() == BookingStatus.HOLDING || booking.getStatus() == BookingStatus.CONFIRMED) {
+                booking.setStatus(BookingStatus.CANCELLED);
+                booking.setCancelled_at(now);
+            }
+        }
+        if (!bookings.isEmpty()) {
+            List<Ticket> tickets = ticketRepository.findAllByBookingIds(bookings.stream().map(Booking::getId).toList());
+            for (Ticket ticket : tickets) {
+                if (ticket.getStatus() != TicketStatus.HOLDING && ticket.getStatus() != TicketStatus.CONFIRMED) continue;
+                if (ticket.getBooking_id().getStatus() == BookingStatus.EXPIRED) {
+                    ticket.setStatus(TicketStatus.EXPIRED);
+                } else if (ticket.getBooking_id().getStatus() == BookingStatus.CANCELLED) {
+                    ticket.setStatus(TicketStatus.CANCELLED);
+                }
+            }
+        }
+
+        trip.setStatus(TripStatus.CANCELLED);
+        trip.setSales_status(TripSalesStatus.CLOSED);
+        trip.setCancelled_at(now);
+        trip.setCancellation_reason(request.getReason());
+        trip.setCancellation_description(request.getDescription());
+        return success(tripResponseMapper.toTripResponse(tripRepository.save(trip)));
+    }
+
+    @Override
+    @Transactional
+    public BaseResponse<Void> deleteTrip(UUID companyId, UUID tripId) {
+        getActiveCompany(companyId);
+        Trip trip = tripRepository.findByIdAndCompanyIdForUpdate(companyId, tripId)
+                .orElseThrow(() -> notFound("Trip was not found for this company"));
+        if (trip.getStatus() != TripStatus.DRAFT || trip.getSales_status() != TripSalesStatus.CLOSED
+                || trip.getActual_departure_at() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only closed draft trips can be deleted");
+        }
+        if (bookingRepository.countByTripId(tripId) > 0 || ticketRepository.countByTripId(tripId) > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Trips with booking or ticket history cannot be deleted");
+        }
+        if (tripIncidentRepository.countByTripId(tripId) > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Trips with incident history cannot be deleted");
+        }
+        tripAssignmentRepository.deleteByCompanyAndTrip(companyId, tripId);
+        tripSeatRepository.deleteByCompanyAndTrip(companyId, tripId);
+        tripRepository.delete(trip);
+        tripRepository.flush();
+        return new BaseResponse<>(ApplicationCode.SUCCESS);
     }
 
     private void snapshotVehicleSeats(UUID companyId, Trip trip, Vehicle vehicle) {

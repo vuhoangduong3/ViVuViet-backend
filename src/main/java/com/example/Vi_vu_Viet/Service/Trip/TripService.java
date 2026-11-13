@@ -3,6 +3,7 @@ package com.example.Vi_vu_Viet.Service.Trip;
 import com.example.Vi_vu_Viet.Entity.Auth.UserAccount;
 import com.example.Vi_vu_Viet.Util.Enums.TripStatus;
 import com.example.Vi_vu_Viet.dto.Request.Trip.CreateTripRequest;
+import com.example.Vi_vu_Viet.dto.Request.Trip.CancelTripRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.AssignTripRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.UpdateTripRequest;
 import com.example.Vi_vu_Viet.dto.Response.BaseResponse;
@@ -33,5 +34,9 @@ public interface TripService {
     BaseResponse<TripResponse> updateTrip(UUID companyId, UUID tripId, UpdateTripRequest request);
 
     BaseResponse<TripResponse> publishTrip(UUID companyId, UUID tripId);
+
+    BaseResponse<TripResponse> cancelTrip(UUID companyId, UUID tripId, CancelTripRequest request);
+
+    BaseResponse<Void> deleteTrip(UUID companyId, UUID tripId);
 
 }

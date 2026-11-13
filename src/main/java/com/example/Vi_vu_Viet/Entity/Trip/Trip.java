@@ -5,6 +5,7 @@ import com.example.Vi_vu_Viet.Entity.Common.BaseEntity;
 import com.example.Vi_vu_Viet.Util.Enums.TripSalesStatus;
 import com.example.Vi_vu_Viet.Util.Enums.TripStatus;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Column;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
@@ -68,6 +69,14 @@ public class Trip extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     TripSalesStatus sales_status;
+
+    LocalDateTime cancelled_at;
+
+    @Column(length = 500)
+    String cancellation_reason;
+
+    @Column(length = 2000)
+    String cancellation_description;
 
     @ToString.Exclude
     @EqualsAndHashCode.Exclude

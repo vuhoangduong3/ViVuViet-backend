@@ -277,6 +277,9 @@ public class DriverServiceImpl implements DriverService {
     }
 
     private TripAssignment findDriverTripForUpdate(UUID userId, UUID tripId) {
+        // Khóa chuyến trước phân công, cùng thứ tự với luồng quản lý chuyến của hãng.
+        tripRepository.findByIdAndDriverIdForUpdate(tripId, userId)
+                .orElseThrow(() -> notFound("Trip assignment was not found"));
         TripAssignment assignment = tripAssignmentRepository.findDriverTripForUpdate(userId, tripId)
                 .orElseThrow(() -> notFound("Trip assignment was not found"));
         requireDriverMembership(userId, assignment.getCompany_id().getId());

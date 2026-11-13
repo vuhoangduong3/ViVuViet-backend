@@ -14,6 +14,9 @@ import java.util.UUID;
 
 @Repository
 public interface TripIncidentRepository extends JpaRepository<TripIncident, UUID> {
+    @Query("select count(incident) from TripIncident incident where incident.trip_id.id = :tripId")
+    long countByTripId(@Param("tripId") UUID tripId);
+
     @EntityGraph(attributePaths = {"trip_id", "reported_by"})
     @Query("select incident from TripIncident incident " +
             "where incident.company_id.id = :companyId and incident.trip_id.company_id.id = :companyId " +
