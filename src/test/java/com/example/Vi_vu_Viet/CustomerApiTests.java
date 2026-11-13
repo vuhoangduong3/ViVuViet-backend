@@ -282,7 +282,7 @@ class CustomerApiTests {
                 .andExpect(jsonPath("$.wsResponse.tickets[0].passengerName").value("Nguyen Van A"))
                 .andExpect(jsonPath("$.wsResponse.tickets[0].seatId").value(ticket.getTrip_seat_id().getId().toString()))
                 .andExpect(jsonPath("$.wsResponse.tickets[0].seatCode").value(ticket.getSeat_label_snapshot()))
-                .andExpect(jsonPath("$.wsResponse.tickets[0].seatClass").value("STANDARD"))
+                .andExpect(jsonPath("$.wsResponse.tickets[0].seatClass").doesNotExist())
                 .andExpect(jsonPath("$.wsResponse.tickets[0].pickupAddress").value("12 Nguyen Trai, Ha Noi"))
                 .andExpect(jsonPath("$.wsResponse.tickets[0].dropoffAddress").value("Ben xe Da Nang"))
                 .andExpect(jsonPath("$.wsResponse.tickets[0].fareAmount").value(250000));

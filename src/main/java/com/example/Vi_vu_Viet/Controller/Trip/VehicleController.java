@@ -48,7 +48,7 @@ public class VehicleController {
         return vehicleService.getSeats(companyId, vehicleId);
     }
 
-    @Operation(summary = "Configure vehicle seat layout", description = "Creates an immutable layout revision. Coordinates start at 1; gaps represent aisles. Seat count sets passengerCapacity. Existing trip snapshots are preserved.")
+    @Operation(summary = "Configure vehicle seat layout", description = "Creates an immutable single-deck layout with no seat classes. Row and column coordinates start at 1; gaps represent aisles. Seat count sets passengerCapacity. Existing trip snapshots are preserved.")
     @PutMapping("/{vehicle_id}/seats")
     public BaseResponse<VehicleSeatLayoutResponse> configureSeats(
             @PathVariable("company_id") UUID companyId, @PathVariable("vehicle_id") UUID vehicleId,

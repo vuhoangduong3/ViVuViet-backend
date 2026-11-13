@@ -16,7 +16,7 @@ import java.util.List;
 
 @Data
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@Schema(description = "Sơ đồ ghế của xe; tầng, hàng và cột bắt đầu từ 1")
+@Schema(description = "Sơ đồ ghế xe một tầng, không phân hạng ghế; hàng và cột bắt đầu từ 1")
 public class ConfigureVehicleSeatsRequest {
 
     @NotBlank
@@ -35,14 +35,6 @@ public class ConfigureVehicleSeatsRequest {
         @Size(max = 20)
         @Pattern(regexp = "[A-Za-z0-9_-]+", message = "Mã ghế chỉ gồm chữ, số, gạch ngang hoặc gạch dưới")
         String seatCode;
-
-        @NotBlank
-        @Size(max = 30)
-        String seatClass = "STANDARD";
-
-        @NotNull
-        @Positive
-        Integer deck;
 
         @NotNull
         @Positive

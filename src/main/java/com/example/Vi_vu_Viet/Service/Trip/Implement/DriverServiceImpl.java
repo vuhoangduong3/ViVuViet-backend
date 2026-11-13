@@ -387,7 +387,6 @@ public class DriverServiceImpl implements DriverService {
         response.setDropoffAddress(ticket.getDropoff_address());
         response.setSeatId(ticket.getTrip_seat_id().getId());
         response.setSeatCode(ticket.getSeat_label_snapshot());
-        response.setSeatClass(ticket.getTrip_seat_id().getSeat_class());
         response.setFareAmount(ticket.getFare_amount());
         response.setStatus(ticket.getStatus());
         response.setPassengerTripStatus(ticket.getPassenger_trip_status());

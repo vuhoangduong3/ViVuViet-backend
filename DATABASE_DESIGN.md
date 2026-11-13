@@ -58,7 +58,7 @@ Admin hãng chỉ xem thông tin khách cần thiết cho hoạt động đặt 
 | areas | Toàn nền tảng | id, parent_id, code, name, type, status | Danh mục tỉnh/thành, quận/huyện hoặc khu vực; hỗ trợ cây phân cấp. |
 | routes | Theo hãng | id, company_id, code, name, origin_area_id, destination_area_id, distance_km, duration_minutes, base_fare_amount, status | Tuyến nối một khu vực đầu với một khu vực cuối; chiều về là tuyến riêng. |
 | seat_layouts | Theo hãng | id, company_id, name, created_at, updated_at | Mỗi lần cấu hình xe tạo một bản sơ đồ mới, nhận diện phiên bản bằng id. |
-| seat_layout_seats | Theo sơ đồ | id, seat_layout_id, seat_code, deck, row_no, column_no, seat_class | Mỗi sơ đồ không trùng seat_code. Ghế tài xế không nằm trong inventory bán vé. |
+| seat_layout_seats | Theo sơ đồ | id, seat_layout_id, seat_code, deck, row_no, column_no, seat_class | Xe một tầng, không phân hạng ghế. deck và seat_class giữ để tương thích DB, ghế mới cố định 1 và STANDARD; API chỉ dùng hàng/cột. Mỗi sơ đồ không trùng seat_code hoặc vị trí hàng/cột. Ghế tài xế không nằm trong inventory bán vé. |
 | vehicles | Theo hãng | id, company_id, plate_normalized, vehicle_model, passenger_capacity, seat_layout_id, default_driver_id, inspection_expires_on, insurance_expires_on, status | Biển số chuẩn hóa; status gồm active, maintenance hoặc retired. |
 
 routes là tuyến mẫu xác định khu vực đầu/cuối. Địa chỉ đón/trả cụ thể được khách nhập khi đặt vé và lưu cùng vé, không cần danh mục địa chỉ của hãng.
@@ -70,8 +70,8 @@ Giá trên routes là giá mặc định. API đặt vé hiện tính giá theo 
 | Bảng | Phạm vi | Cột quan trọng | Ghi chú |
 |---|---|---|---|
 | trips | Theo hãng | id, company_id, route_id, trip_code, departure_at, expected_arrival_at, actual_departure_at, actual_arrival_at, status, sales_status, booking_cutoff_at, created_by | Chuyến cụ thể vào ngày/giờ cụ thể; xe và tài xế lưu trong bảng phân công. |
-| trip_seats | Theo chuyến | id, company_id, trip_id, seat_code, seat_class, deck, row_no, column_no | Inventory được chụp tự động từ sơ đồ xe khi phân xe và làm mới khi mở bán chuyến nháp. UNIQUE(company_id, trip_id, seat_code). |
-| trip_fares | Theo chuyến | id, company_id, trip_id, seat_class, amount, currency | Giá theo chuyến và hạng ghế; giá cụ thể được chụp vào vé. |
+| trip_seats | Theo chuyến | id, company_id, trip_id, seat_code, seat_class, deck, row_no, column_no | Inventory được chụp tự động từ sơ đồ xe khi phân xe và làm mới khi mở bán chuyến nháp. seat_class và deck giữ để tương thích DB, ghế mới cố định STANDARD và 1; không xuất hiện trong API. UNIQUE(company_id, trip_id, seat_code). |
+| trip_fares | Theo chuyến | id, company_id, trip_id, amount, currency | Bảng đề xuất nếu cần giá riêng theo chuyến; không phân hạng ghế. API hiện dùng giá mặc định của tuyến và chụp giá cụ thể vào vé. |
 | trip_vehicle_assignments | Theo chuyến | id, company_id, trip_id, vehicle_id, occupied_from, occupied_to, status, assigned_by, replaced_by, reason | Lịch sử phân xe; khoảng chiếm dụng tính cả thời gian chuẩn bị/quay đầu cần thiết. |
 | trip_driver_assignments | Theo chuyến | id, company_id, trip_id, driver_profile_id, driver_user_id, duty_role, occupied_from, occupied_to, assignment_status, accepted_at, agreed_compensation_amount | Hỗ trợ tài xế chính/phụ; lưu mức công đã thỏa thuận của chuyến. |
 

@@ -274,8 +274,6 @@ public class BookingServiceImpl implements BookingService {
             TripSeatResponse response = new TripSeatResponse();
             response.setId(seat.getId());
             response.setSeatCode(seat.getSeat_code());
-            response.setSeatClass(seat.getSeat_class());
-            response.setDeck(seat.getDeck());
             response.setRowNo(seat.getRow_no());
             response.setColumnNo(seat.getColumn_no());
             response.setAvailable(!occupiedSeatIds.contains(seat.getId()));
@@ -344,7 +342,6 @@ public class BookingServiceImpl implements BookingService {
         response.setDropoffAddress(ticket.getDropoff_address());
         response.setSeatId(ticket.getTrip_seat_id().getId());
         response.setSeatCode(ticket.getSeat_label_snapshot());
-        response.setSeatClass(ticket.getTrip_seat_id().getSeat_class());
         response.setFareAmount(ticket.getFare_amount());
         response.setStatus(expiredHold && ticket.getStatus() == TicketStatus.HOLDING
                 ? TicketStatus.EXPIRED : ticket.getStatus());

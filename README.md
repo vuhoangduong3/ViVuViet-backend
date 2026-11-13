@@ -127,21 +127,25 @@ API đặt vé yêu cầu đăng nhập. Ghế được giữ trong 5 phút; kh�
 
 Admin hãng cấu hình sơ đồ ghế cho xe bằng `PUT /api/v1/bus-companies/{company_id}/vehicles/{vehicle_id}/seats`, xem bằng `GET` cùng URL. Xe chưa cấu hình trả `seatLayoutId: null` và `seats: []`. Mỗi lần lưu tạo một phiên bản sơ đồ mới và cập nhật `passengerCapacity` bằng số ghế. Sau đó tạo chuyến nháp, phân xe và tài xế qua `PUT /api/v1/bus-companies/{company_id}/trips/{trip_id}/assignments`, rồi mở bán chuyến. Endpoint cấu hình ghế theo chuyến đã được bỏ. Khách xem ghế tại `GET /api/v1/trips/{trip_id}/seats`, tạo đặt vé bằng `POST /api/v1/me/bookings`, rồi xác nhận tại `POST /api/v1/me/bookings/{booking_id}/confirm`. Có thể xem danh sách/chi tiết tại `GET /api/v1/me/bookings` và `GET /api/v1/me/bookings/{booking_id}`, hoặc hủy bằng `POST /api/v1/me/bookings/{booking_id}/cancel`.
 
-Ví dụ cấu hình ghế cho xe (tầng, hàng, cột bắt đầu từ 1; cột 2 để trống làm lối đi):
+Xe chỉ có một tầng và không phân loại ghế VIP/thường. Cấu hình ghế chỉ cần `seatCode`, `rowNo`, `columnNo`; API ghế và vé không trả `seatClass` hoặc `deck`.
+
+Ví dụ cấu hình ghế cho xe (hàng, cột bắt đầu từ 1; cột 2 để trống làm lối đi):
 
 ```json
 {
   "wsRequest": {
     "name": "Sơ đồ xe 2 chỗ",
     "seats": [
-      { "seatCode": "A01", "seatClass": "STANDARD", "deck": 1, "rowNo": 1, "columnNo": 1 },
-      { "seatCode": "A02", "seatClass": "STANDARD", "deck": 1, "rowNo": 1, "columnNo": 3 }
+      { "seatCode": "A01", "rowNo": 1, "columnNo": 1 },
+      { "seatCode": "A02", "rowNo": 1, "columnNo": 3 }
     ]
   }
 }
 ```
 
-Ghế của chuyến là bản chụp từ cấu hình xe khi phân xe; mở bán cập nhật lại bản chụp của chuyến nháp. API ghế chuyến trả thêm `deck`, `rowNo`, `columnNo`. ID ghế trong sơ đồ xe khác ID ghế chuyến; đặt vé dùng ID trả từ API ghế chuyến. Sửa sơ đồ xe không sửa các chuyến đã mở bán. Khi đổi xe cho chuyến đã có bất kỳ đặt vé nào, sơ đồ mới phải giống toàn bộ mã ghế, hạng và vị trí; nếu không trả 409.
+Ghế của chuyến là bản chụp từ cấu hình xe khi phân xe; mở bán cập nhật lại bản chụp của chuyến nháp. API ghế chuyến trả thêm `rowNo`, `columnNo`. ID ghế trong sơ đồ xe khác ID ghế chuyến; đặt vé dùng ID trả từ API ghế chuyến. Sửa sơ đồ xe không sửa các chuyến đã mở bán. Khi đổi xe cho chuyến đã có bất kỳ đặt vé nào, sơ đồ mới phải giống toàn bộ mã ghế và vị trí hàng/cột; nếu không trả 409.
+
+Các cột `seat_class` và `deck` được giữ trong database để tương thích dữ liệu cũ; ghế tạo mới luôn dùng giá trị nội bộ `STANDARD` và tầng `1`. API không sử dụng chúng để phân loại, định giá hoặc so sánh sơ đồ.
 
 DB hiện dùng `ddl-auto=update` để thêm hai bảng sơ đồ, liên kết trên xe và tọa độ trên ghế chuyến. Dữ liệu ghế chuyến cũ có tọa độ null: chuyến chưa có đặt vé cần cấu hình xe và phân xe lại; chuyến đã có đặt vé cần chuyển dữ liệu tọa độ theo sơ đồ thực tế trước khi đổi xe. Server không suy đoán tọa độ từ mã ghế.
 
@@ -238,7 +242,7 @@ Mỗi phần tử trong `content` có cùng cấu trúc với chi tiết đặt 
 | `trip` | `id`, `tripCode`, `status`, `departureAt`, `expectedArrivalAt`, `timezone` |
 | Hãng trong `trip` | `companyId`, `companyName`, `companyHotline` |
 | Tuyến trong `trip` | `routeId`, `routeCode`, `routeName`, `originAreaId`, `originAreaName`, `destinationAreaId`, `destinationAreaName` |
-| Mỗi phần tử `tickets` | `id`, `ticketCode`, `status`, `createdAt`, `passengerName`, `passengerPhone`, `pickupAddress`, `dropoffAddress`, `seatId`, `seatCode`, `seatClass`, `fareAmount` |
+| Mỗi phần tử `tickets` | `id`, `ticketCode`, `status`, `createdAt`, `passengerName`, `passengerPhone`, `pickupAddress`, `dropoffAddress`, `seatId`, `seatCode`, `fareAmount` |
 
 `quotedTotalAmount`, `fareAmount` và `seatCode` được giữ theo dữ liệu lúc đặt. Thông tin hãng/tuyến/lịch chuyến phản ánh dữ liệu hiện tại. Các mốc thời gian được trả ở dạng ISO local datetime; `trip.timezone` là múi giờ của hãng. `pickupAddress` và `dropoffAddress` là địa chỉ khách nhập cho từng vé.
 

@@ -12,8 +12,6 @@ public class VehicleSeatLayoutResponse {
     public static class Seat {
         private UUID id;
         private String seatCode;
-        private String seatClass;
-        private Integer deck;
         private Integer rowNo;
         private Integer columnNo;
     }

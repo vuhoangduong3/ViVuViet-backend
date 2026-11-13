@@ -41,9 +41,10 @@ public class TripSeat extends BaseEntity {
     @JoinColumn(name = "trip_id", nullable = false)
     Trip trip_id;
 
-    // Snapshot coordinates; nullable for legacy inventory awaiting migration.
+    // Deck is fixed at 1; the column is retained for existing databases.
     @Column(name = "deck")
-    Integer deck;
+    Integer deck = 1;
+    // Snapshot coordinates; nullable for legacy inventory awaiting migration.
     @Column(name = "row_no")
     Integer row_no;
     @Column(name = "column_no")
@@ -52,6 +53,7 @@ public class TripSeat extends BaseEntity {
     @Column(name = "seat_code", nullable = false, length = 20)
     String seat_code;
 
+    // All seats share one class; keep the legacy non-null column populated.
     @Column(name = "seat_class", nullable = false, length = 30)
-    String seat_class;
+    String seat_class = "STANDARD";
 }

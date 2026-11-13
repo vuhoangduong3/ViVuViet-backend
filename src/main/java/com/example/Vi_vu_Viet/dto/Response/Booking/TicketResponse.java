@@ -21,7 +21,6 @@ public class TicketResponse {
     String dropoffAddress;
     UUID seatId;
     String seatCode;
-    String seatClass;
     Long fareAmount;
     TicketStatus status;
     PassengerTripStatus passengerTripStatus;

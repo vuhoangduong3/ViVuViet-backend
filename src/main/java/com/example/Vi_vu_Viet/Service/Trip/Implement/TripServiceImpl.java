@@ -295,7 +295,7 @@ public class TripServiceImpl implements TripService {
 
     private void snapshotVehicleSeats(UUID companyId, Trip trip, Vehicle vehicle) {
         if (vehicle.getSeat_layout() == null) throw badRequest("Configure the vehicle seat layout first");
-        var configured = seatLayoutSeatRepository.findAllByLayoutIdOrderByDeckAscRowNoAscColumnNoAsc(
+        var configured = seatLayoutSeatRepository.findAllByLayoutIdOrderByRowNoAscColumnNoAsc(
                 vehicle.getSeat_layout().getId());
         if (configured.isEmpty() || configured.size() != vehicle.getPassenger_capacity()) {
             throw badRequest("Vehicle seat layout must match passenger capacity");
@@ -304,8 +304,7 @@ public class TripServiceImpl implements TripService {
         var byCode = configured.stream().collect(Collectors.toMap(s -> s.getSeatCode(), s -> s));
         boolean identical = existing.size() == configured.size() && existing.stream().allMatch(seat -> {
             var target = byCode.get(seat.getSeat_code());
-            return target != null && java.util.Objects.equals(seat.getSeat_class(), target.getSeatClass())
-                    && java.util.Objects.equals(seat.getDeck(), target.getDeck())
+            return target != null
                     && java.util.Objects.equals(seat.getRow_no(), target.getRowNo())
                     && java.util.Objects.equals(seat.getColumn_no(), target.getColumnNo());
         });
@@ -320,8 +319,6 @@ public class TripServiceImpl implements TripService {
             seat.setCompany_id(trip.getCompany_id());
             seat.setTrip_id(trip);
             seat.setSeat_code(source.getSeatCode());
-            seat.setSeat_class(source.getSeatClass());
-            seat.setDeck(source.getDeck());
             seat.setRow_no(source.getRowNo());
             seat.setColumn_no(source.getColumnNo());
             return seat;
@@ -367,7 +364,6 @@ public class TripServiceImpl implements TripService {
         response.setDropoffAddress(ticket.getDropoff_address());
         response.setSeatId(ticket.getTrip_seat_id().getId());
         response.setSeatCode(ticket.getSeat_label_snapshot());
-        response.setSeatClass(ticket.getTrip_seat_id().getSeat_class());
         response.setFareAmount(ticket.getFare_amount());
         response.setStatus(expiredHold && ticket.getStatus() == TicketStatus.HOLDING
                 ? TicketStatus.EXPIRED : ticket.getStatus());

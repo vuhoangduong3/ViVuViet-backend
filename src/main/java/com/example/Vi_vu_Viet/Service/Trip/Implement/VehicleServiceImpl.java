@@ -70,14 +70,12 @@ public class VehicleServiceImpl implements VehicleService {
         for (var input : request.getSeats()) {
             String code = input.getSeatCode().trim().toUpperCase(Locale.ROOT);
             if (!codes.add(code)) throw badRequest("Duplicate seat code");
-            if (!positions.add(input.getDeck() + ":" + input.getRowNo() + ":" + input.getColumnNo())) {
+            if (!positions.add(input.getRowNo() + ":" + input.getColumnNo())) {
                 throw badRequest("Two seats cannot occupy the same position");
             }
             var seat = new SeatLayoutSeat();
             seat.setLayout(layout);
             seat.setSeatCode(code);
-            seat.setSeatClass(input.getSeatClass().trim().toUpperCase(Locale.ROOT));
-            seat.setDeck(input.getDeck());
             seat.setRowNo(input.getRowNo());
             seat.setColumnNo(input.getColumnNo());
             seats.add(seat);
@@ -97,12 +95,10 @@ public class VehicleServiceImpl implements VehicleService {
         result.setSeatLayoutId(layout == null ? null : layout.getId());
         result.setName(layout == null ? null : layout.getName());
         result.setSeats(layout == null ? List.of() : seatLayoutSeatRepository
-                .findAllByLayoutIdOrderByDeckAscRowNoAscColumnNoAsc(layout.getId()).stream().map(seat -> {
+                .findAllByLayoutIdOrderByRowNoAscColumnNoAsc(layout.getId()).stream().map(seat -> {
                     var dto = new Seat();
                     dto.setId(seat.getId());
                     dto.setSeatCode(seat.getSeatCode());
-                    dto.setSeatClass(seat.getSeatClass());
-                    dto.setDeck(seat.getDeck());
                     dto.setRowNo(seat.getRowNo());
                     dto.setColumnNo(seat.getColumnNo());
                     return dto;
@@ -175,7 +171,7 @@ public class VehicleServiceImpl implements VehicleService {
         }
         if (request.getPassengerCapacity() != null) {
             if (vehicle.getSeat_layout() != null && seatLayoutSeatRepository
-                    .findAllByLayoutIdOrderByDeckAscRowNoAscColumnNoAsc(vehicle.getSeat_layout().getId()).size()
+                    .findAllByLayoutIdOrderByRowNoAscColumnNoAsc(vehicle.getSeat_layout().getId()).size()
                     != request.getPassengerCapacity()) {
                 throw badRequest("Capacity must match the configured seat count");
             }

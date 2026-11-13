@@ -16,10 +16,11 @@ public class SeatLayoutSeat extends BaseEntity {
     private SeatLayout layout;
     @Column(name = "seat_code", nullable = false, length = 20)
     private String seatCode;
+    // Fixed legacy values retained for compatibility with the existing database schema.
     @Column(name = "seat_class", nullable = false, length = 30)
-    private String seatClass;
+    private String seatClass = "STANDARD";
     @Column(nullable = false)
-    private Integer deck;
+    private Integer deck = 1;
     @Column(name = "row_no", nullable = false)
     private Integer rowNo;
     @Column(name = "column_no", nullable = false)
