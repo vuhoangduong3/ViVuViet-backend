@@ -1,5 +1,6 @@
 package com.example.Vi_vu_Viet.Entity.Trip;
 
+import com.example.Vi_vu_Viet.Entity.Auth.UserAccount;
 import com.example.Vi_vu_Viet.Entity.Common.BaseEntity;
 import com.example.Vi_vu_Viet.Util.Enums.TicketStatus;
 import com.example.Vi_vu_Viet.Util.Enums.PassengerTripStatus;
@@ -19,10 +20,12 @@ import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.DynamicUpdate;
 
 import java.time.LocalDateTime;
 
 @Entity
+@DynamicUpdate
 @Data
 @EqualsAndHashCode(callSuper = true)
 @Table(
@@ -83,6 +86,18 @@ public class Ticket extends BaseEntity {
 
     @Column(name = "fare_amount", nullable = false)
     Long fare_amount;
+
+    @Column(name = "collected_amount")
+    Long collected_amount;
+
+    @Column(name = "collected_at")
+    LocalDateTime collected_at;
+
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "collected_by")
+    UserAccount collected_by;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

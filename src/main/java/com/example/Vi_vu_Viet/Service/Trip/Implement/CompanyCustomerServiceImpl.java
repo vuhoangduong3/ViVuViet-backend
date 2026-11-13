@@ -168,6 +168,10 @@ public class CompanyCustomerServiceImpl implements CompanyCustomerService {
         response.setSeatId(ticket.getTrip_seat_id().getId());
         response.setSeatCode(ticket.getSeat_label_snapshot());
         response.setFareAmount(ticket.getFare_amount());
+        response.setPaymentCollected(ticket.getCollected_at() == null ? null : Boolean.TRUE);
+        response.setCollectedAmount(ticket.getCollected_amount());
+        response.setCollectedAt(ticket.getCollected_at());
+        response.setCollectedBy(ticket.getCollected_by() == null ? null : ticket.getCollected_by().getId());
         response.setStatus(expiredHold && ticket.getStatus() == TicketStatus.HOLDING
                 ? TicketStatus.EXPIRED : ticket.getStatus());
         response.setPassengerTripStatus(ticket.getPassenger_trip_status());

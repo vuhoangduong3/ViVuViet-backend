@@ -15,6 +15,7 @@ public class DriverTripResponse {
     TripResponse trip;
     VehicleResponse vehicle;
     DriverAssignmentStatus assignmentStatus;
+    long passengerCount;
     LocalDateTime acceptedAt;
     String rejectionReason;
     List<TicketResponse> passengers;

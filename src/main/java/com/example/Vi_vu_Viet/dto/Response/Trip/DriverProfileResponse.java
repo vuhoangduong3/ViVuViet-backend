@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
@@ -17,9 +18,12 @@ public class DriverProfileResponse {
     UUID userId;
     String fullName;
     String phone;
+    String email;
+    LocalDateTime joinedAt;
     String employeeCode;
     String licenseNumber;
     String licenseClass;
     LocalDate licenseExpiresOn;
+    String licenseStatus;
     DriverProfileStatus status;
 }

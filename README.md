@@ -315,7 +315,52 @@ Mỗi phần tử trong `content` có cùng cấu trúc với chi tiết đặt 
 
 `quotedTotalAmount`, `fareAmount` và `seatCode` được giữ theo dữ liệu lúc đặt. Thông tin hãng/tuyến/lịch chuyến phản ánh dữ liệu hiện tại. Các mốc thời gian được trả ở dạng ISO local datetime; `trip.timezone` là múi giờ của hãng. `pickupAddress` và `dropoffAddress` là địa chỉ khách nhập cho từng vé.
 
-Frontend dùng `bookingCode`/`ticketCode` để hiển thị mã đặt vé/vé; `CONFIRMED` là trạng thái đã xác nhận. Chức năng QR check-in, thông tin xe/tài xế và thanh toán chưa có trong mô hình hiện tại.
+Frontend dùng `bookingCode`/`ticketCode` để hiển thị mã đặt vé/vé; `CONFIRMED` là trạng thái đã xác nhận đặt vé. Mỗi vé còn trả `paymentCollected`, `collectedAmount`, `collectedAt`, `collectedBy` từ thao tác xác nhận thu tiền mặt của tài xế. Chức năng QR check-in, thông tin xe/tài xế trong response đặt vé và thanh toán trực tuyến chưa có trong mô hình hiện tại.
+
+## API tài xế xác nhận thu tiền mặt
+
+`POST /api/v1/me/driver/trips/{trip_id}/passengers/{ticket_id}/collect-payment`
+yêu cầu Bearer token của tài xế có membership `DRIVER` đang hoạt động tại hãng,
+đang được phân công và đã nhận chuyến. Phân công `ASSIGNED`, `REJECTED`, `REPLACED`
+không được xác nhận thu tiền. Phân công đã hoàn thành vẫn được ghi nhận thu tiền.
+
+```json
+{
+  "wsRequest": {
+    "collectedAmount": 250000
+  }
+}
+```
+
+`collectedAmount` là số tiền mặt thực tế đã thu cho **một vé**, số nguyên VND lớn hơn 0.
+Số tiền này có thể khác `fareAmount` để giữ số thực thu phục vụ đối soát.
+Đây là xác nhận thu một lần, không hỗ trợ thu nhiều đợt hoặc cộng dồn.
+Server tự lấy người thu từ tài khoản đăng nhập và thời điểm thu từ thời gian server.
+Vé và đơn phải `CONFIRMED`; chuyến phải `SCHEDULED`, `IN_PROGRESS` hoặc `COMPLETED`.
+ID vé không thuộc chuyến/hãng được phân công trả `404`, trạng thái không hợp lệ trả `409`.
+
+Response `wsResponse` là `TicketResponse`, bổ sung:
+
+| Trường | Ý nghĩa |
+| --- | --- |
+| `paymentCollected` | `true` khi có xác nhận thu tiền; `null` khi chưa có dữ liệu thu tiền, giữ cách trả của API chi tiết chuyến cũ |
+| `collectedAmount` | Số tiền mặt đã ghi nhận, `null` nếu chưa xác nhận |
+| `collectedAt` | Thời điểm xác nhận dạng ISO local datetime, `null` nếu chưa xác nhận |
+| `collectedBy` | UUID tài xế đã xác nhận, `null` nếu chưa xác nhận |
+
+Gửi lại cùng số tiền trả biên nhận đã lưu, giữ nguyên người và thời điểm thu.
+Gửi số tiền khác sau khi đã xác nhận trả `409`. Khóa chuyến, phân công và đơn trong
+cùng transaction bảo vệ thao tác gửi lặp/đồng thời và đồng bộ với luồng hủy đơn.
+Không có thao tác sửa/xóa xác nhận hoặc hoàn tiền trong API này.
+Thông tin thu tiền được trả nhất quán trong các API có `TicketResponse`, gồm chi tiết
+chuyến tài xế, chi tiết chuyến admin và vé đặt của khách.
+
+Entity `Ticket` bổ sung các cột nullable `collected_amount`, `collected_at`,
+`collected_by` (FK tới `users`). Với cấu hình `spring.jpa.hibernate.ddl-auto=update`
+hiện tại, Hibernate thêm cột khi ứng dụng khởi động; vé cũ giữ null, không suy đoán
+đã thanh toán từ `CONFIRMED`. Chỉ dùng `collectedAt` để xác định có xác nhận thu tiền.
+API `/reports/revenue` hiện vẫn báo cáo giá trị vé theo trạng thái; việc tổng hợp
+thực thu, tiền công và đối soát doanh thu là phần bổ sung riêng.
 
 ## API admin quản lý tài xế (màn A3)
 
@@ -388,12 +433,13 @@ Vé hủy/hết hạn và đơn `HOLDING` đã quá hạn không chiếm ghế. 
 
 Mỗi phần tử `passengers` giữ toàn bộ trường của `TicketResponse`:
 `id`, `ticketCode`, `passengerName`, `passengerPhone`, `pickupAddress`, `dropoffAddress`,
-`seatId`, `seatCode`, `fareAmount`, `status`, `passengerTripStatus`, `createdAt`;
-bổ sung `bookingId`, `bookingCode`, `bookingStatus`, `contactName`, `contactPhone`, `paymentCollected`.
+`seatId`, `seatCode`, `fareAmount`, `status`, `passengerTripStatus`, `createdAt`,
+`paymentCollected`, `collectedAmount`, `collectedAt`, `collectedBy`;
+bổ sung `bookingId`, `bookingCode`, `bookingStatus`, `contactName`, `contactPhone`.
 Nếu `passengerPhone` là null, FE có thể hiển thị `contactPhone`.
 `ticketCount` tính cả vé đã hủy/hết hạn; `activeTicketCount` chỉ tính vé còn hiệu lực.
-`paymentCollected` hiện luôn là `null` vì hệ thống chưa lưu tiền thực thu. FE không được
-hiển thị “Đã thu” chỉ dựa vào `CONFIRMED`; trạng thái này chỉ xác nhận việc đặt vé.
+`paymentCollected` là `true` khi tài xế đã xác nhận thu tiền mặt, còn lại giữ `null` như API cũ.
+FE không được hiển thị “Đã thu” chỉ dựa vào `CONFIRMED`; trạng thái này chỉ xác nhận việc đặt vé.
 
 `history[]` có `eventType`, `title`, `occurredAt`, `expectedAt`, `actorId`, `actorName`,
 `description`, `state`. Các sự kiện đã xảy ra có `state = DONE`, sắp theo thời gian tăng dần.

@@ -26,6 +26,10 @@ public interface TicketRepository extends JpaRepository<Ticket, UUID> {
     @Query("select count(ticket) from Ticket ticket where ticket.trip_id.id = :tripId")
     long countByTripId(@Param("tripId") UUID tripId);
 
+    @Query("select count(ticket) from Ticket ticket where ticket.trip_id.id = :tripId " +
+            "and ticket.status = com.example.Vi_vu_Viet.Util.Enums.TicketStatus.CONFIRMED")
+    long countConfirmedByTripId(@Param("tripId") UUID tripId);
+
     @EntityGraph(attributePaths = "trip_seat_id")
     @Query("select ticket from Ticket ticket where ticket.booking_id.id = :bookingId " +
             "order by ticket.created_at, ticket.id")
@@ -46,6 +50,13 @@ public interface TicketRepository extends JpaRepository<Ticket, UUID> {
     @EntityGraph(attributePaths = {"trip_seat_id"})
     @Query("select ticket from Ticket ticket where ticket.id = :ticketId and ticket.trip_id.id = :tripId")
     Optional<Ticket> findByIdAndTripId(@Param("ticketId") UUID ticketId, @Param("tripId") UUID tripId);
+
+    @Query("select ticket.booking_id.id from Ticket ticket " +
+            "where ticket.id = :ticketId and ticket.trip_id.id = :tripId " +
+            "and ticket.company_id.id = :companyId")
+    Optional<UUID> findBookingIdByTicketAndTrip(@Param("companyId") UUID companyId,
+                                               @Param("ticketId") UUID ticketId,
+                                               @Param("tripId") UUID tripId);
 
     @Query("select count(ticket) from Ticket ticket where ticket.company_id.id = :companyId " +
             "and lower(ticket.ticket_code) = lower(:ticketCode)")

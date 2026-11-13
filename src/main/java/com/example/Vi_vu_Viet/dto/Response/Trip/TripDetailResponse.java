@@ -59,8 +59,6 @@ public class TripDetailResponse extends TripResponse {
         BookingStatus bookingStatus;
         String contactName;
         String contactPhone;
-        @Schema(description = "null khi chưa có dữ liệu thu tiền; không suy ra từ trạng thái xác nhận vé")
-        Boolean paymentCollected;
     }
 
     public record HistoryItem(String eventType, String title, LocalDateTime occurredAt, LocalDateTime expectedAt,

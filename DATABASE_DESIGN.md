@@ -187,13 +187,15 @@ Không partition tickets một cách máy móc theo thời gian tạo: mọi vé
 
 Worker hết hạn giữ chỗ, gửi thông báo và tổng hợp báo cáo là tiến trình nền, không phải API công khai. Consumer của outbox phải chịu được việc nhận cùng một event nhiều lần. Không đưa dữ liệu cá nhân không cần thiết vào payload event.
 
-## 9. Doanh thu trong giai đoạn chưa có thanh toán
+## 9. Xác nhận thu tiền mặt và báo cáo doanh thu
 
-Ở giai đoạn này có thể báo cáo số vé xác nhận, số vé hủy, giá trị vé dự kiến và tiền công tài xế đã thỏa thuận. Chưa thể báo cáo chính xác thực thu, vé đã thu hoặc chênh lệch tiền mặt nếu chưa có bản ghi nghiệp vụ thu tiền.
+Luồng tài xế đã có xác nhận thu tiền mặt một lần cho từng vé, lưu tại `tickets.collected_amount`, `collected_at`, `collected_by` (FK tới `users`). Có `collected_at` nghĩa là đã ghi nhận thu tiền; các vé cũ không có xác nhận giữ null. Số tiền là giá trị thực tế tài xế xác nhận, có thể khác snapshot giá vé. API không cộng dồn, sửa hoặc xóa biên nhận; gửi lại cùng số tiền trả kết quả cũ, gửi số tiền khác trả xung đột.
+
+Báo cáo `/reports/revenue` hiện vẫn tổng hợp giá trị vé theo trạng thái và ngày khởi hành. Chưa tổng hợp các xác nhận thu tiền này thành KPI thực thu, vé đã thu hoặc đối soát theo chuyến; tiền công và bàn giao/hoàn tiền cũng cần được xử lý riêng.
 
 Không dùng trạng thái booking=paid khi chưa có thanh toán. Giá vé xác nhận và mức công của từng chuyến vẫn lưu snapshot để thay đổi cấu hình về sau không làm sai số liệu lịch sử.
 
-Khi bắt đầu thu tiền, bổ sung tối thiểu payments, payment_transactions và refunds. Nếu cần thu/bàn giao tiền mặt, bổ sung cash_collections và cash_handover_batches. Giao dịch thanh toán phải có mã tham chiếu nhà cung cấp, trạng thái, số tiền, currency, thời điểm và cơ chế chống webhook trùng.
+Khi mở rộng thanh toán trực tuyến, bổ sung payments, payment_transactions và refunds. Nếu cần quản lý nhiều đợt thu hoặc bàn giao tiền mặt, bổ sung cash_collections và cash_handover_batches. Giao dịch thanh toán trực tuyến phải có mã tham chiếu nhà cung cấp, trạng thái, số tiền, currency, thời điểm và cơ chế chống webhook trùng.
 
 ## 10. Mở rộng sau này
 

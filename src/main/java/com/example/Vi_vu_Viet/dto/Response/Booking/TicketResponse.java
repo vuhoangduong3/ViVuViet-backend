@@ -2,6 +2,7 @@ package com.example.Vi_vu_Viet.dto.Response.Booking;
 
 import com.example.Vi_vu_Viet.Util.Enums.TicketStatus;
 import com.example.Vi_vu_Viet.Util.Enums.PassengerTripStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
@@ -22,6 +23,11 @@ public class TicketResponse {
     UUID seatId;
     String seatCode;
     Long fareAmount;
+    @Schema(description = "true khi tài xế đã xác nhận thu tiền; null khi chưa có dữ liệu thu tiền, không suy ra từ CONFIRMED")
+    Boolean paymentCollected;
+    Long collectedAmount;
+    LocalDateTime collectedAt;
+    UUID collectedBy;
     TicketStatus status;
     PassengerTripStatus passengerTripStatus;
     LocalDateTime createdAt;

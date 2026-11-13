@@ -1,5 +1,6 @@
 package com.example.Vi_vu_Viet.Service.Trip.Implement;
 
+import com.example.Vi_vu_Viet.Entity.Trip.Booking;
 import com.example.Vi_vu_Viet.Entity.Trip.CompanyMember;
 import com.example.Vi_vu_Viet.Entity.Trip.DriverProfile;
 import com.example.Vi_vu_Viet.Entity.Trip.Trip;
@@ -9,6 +10,7 @@ import com.example.Vi_vu_Viet.Entity.Trip.Ticket;
 import com.example.Vi_vu_Viet.Entity.Trip.Vehicle;
 import com.example.Vi_vu_Viet.Entity.Trip.TripHistoryEvent.Type;
 import com.example.Vi_vu_Viet.Repository.Auth.UserRepository;
+import com.example.Vi_vu_Viet.Repository.Trip.BookingRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.CompanyMemberRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.DriverProfileRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.TicketRepository;
@@ -17,6 +19,7 @@ import com.example.Vi_vu_Viet.Repository.Trip.TripIncidentRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.TripRepository;
 import com.example.Vi_vu_Viet.Service.Trip.DriverService;
 import com.example.Vi_vu_Viet.Util.ApplicationCode;
+import com.example.Vi_vu_Viet.Util.Enums.BookingStatus;
 import com.example.Vi_vu_Viet.Util.Enums.CompanyMemberRoleType;
 import com.example.Vi_vu_Viet.Util.Enums.CompanyMemberStatus;
 import com.example.Vi_vu_Viet.Util.Enums.DriverAssignmentStatus;
@@ -25,6 +28,7 @@ import com.example.Vi_vu_Viet.Util.Enums.IncidentStatus;
 import com.example.Vi_vu_Viet.Util.Enums.PassengerTripStatus;
 import com.example.Vi_vu_Viet.Util.Enums.TicketStatus;
 import com.example.Vi_vu_Viet.Util.Enums.TripStatus;
+import com.example.Vi_vu_Viet.dto.Request.Trip.CollectTicketPaymentRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.ReportTripIncidentRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.RejectTripRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.UpdateDriverProfileRequest;
@@ -59,6 +63,7 @@ public class DriverServiceImpl implements DriverService {
     TripAssignmentRepository tripAssignmentRepository;
     TripRepository tripRepository;
     TicketRepository ticketRepository;
+    BookingRepository bookingRepository;
     TripIncidentRepository tripIncidentRepository;
     UserRepository userRepository;
     TripResponseMapper tripResponseMapper;
@@ -82,6 +87,10 @@ public class DriverServiceImpl implements DriverService {
     @Override
     @Transactional
     public BaseResponse<DriverProfileResponse> updateDriverProfile(UUID userId, UpdateDriverProfileRequest request) {
+        if (request.getLicenseNumber() != null || request.getLicenseClass() != null
+                || request.getLicenseExpiresOn() != null) {
+            throw forbidden("Only a company admin can update driver license information");
+        }
         if (!hasProfileChanges(request)) throw badRequest("At least one profile field must be provided");
         // Keep self-service profile changes from overwriting an admin's lock or reset metadata.
         userRepository.findByIdForUpdate(userId).orElseThrow(() -> notFound("Driver account was not found"));
@@ -99,14 +108,7 @@ public class DriverServiceImpl implements DriverService {
                     created.setStatus(DriverProfileStatus.ACTIVE);
                     return created;
                 });
-        if (request.getLicenseNumber() != null && driverProfileRepository.existsLicenseForAnotherProfile(
-                request.getCompanyId(), request.getLicenseNumber(), profile.getId())) {
-            throw badRequest("License number already exists for this company");
-        }
         if (request.getEmployeeCode() != null) profile.setEmployee_code(request.getEmployeeCode());
-        if (request.getLicenseNumber() != null) profile.setLicense_number(request.getLicenseNumber());
-        if (request.getLicenseClass() != null) profile.setLicense_class(request.getLicenseClass());
-        if (request.getLicenseExpiresOn() != null) profile.setLicense_expires_on(request.getLicenseExpiresOn());
         return success(toDriverProfileResponse(driverProfileRepository.save(profile)));
     }
 
@@ -177,6 +179,27 @@ public class DriverServiceImpl implements DriverService {
 
     @Override
     @Transactional
+    public BaseResponse<DriverTripResponse> updateAssignmentStatus(UUID userId, UUID tripId,
+                                                                    DriverAssignmentStatus status) {
+        TripAssignment assignment = findDriverTripForUpdate(userId, tripId);
+        if (assignment.getTrip_id().getStatus() != TripStatus.SCHEDULED) {
+            throw conflict("Assignment status can only be updated before departure");
+        }
+        DriverAssignmentStatus current = assignment.getAssignment_status();
+        if (status != DriverAssignmentStatus.PREPARING && status != DriverAssignmentStatus.ARRIVED) {
+            throw badRequest("Status must be PREPARING or ARRIVED");
+        }
+        if (current != status && !((current == DriverAssignmentStatus.ACCEPTED && status == DriverAssignmentStatus.PREPARING)
+                || (current == DriverAssignmentStatus.PREPARING && status == DriverAssignmentStatus.ARRIVED))) {
+            throw conflict("Assignment status transition is not allowed");
+        }
+        assignment.setAssignment_status(status);
+        tripAssignmentRepository.save(assignment);
+        return success(toDriverTripResponse(assignment, true));
+    }
+
+    @Override
+    @Transactional
     public BaseResponse<DriverTripResponse> updateTripProgress(UUID userId, UUID tripId,
                                                                UpdateTripProgressRequest request) {
         TripAssignment assignment = findDriverTripForUpdate(userId, tripId);
@@ -237,6 +260,49 @@ public class DriverServiceImpl implements DriverService {
         if (status == PassengerTripStatus.PICKED_UP && ticket.getBoarded_at() == null) ticket.setBoarded_at(now);
         if (status == PassengerTripStatus.DROPPED_OFF && ticket.getCompleted_at() == null) ticket.setCompleted_at(now);
         return success(toTicketResponse(ticket));
+    }
+
+    @Override
+    @Transactional
+    public BaseResponse<TicketResponse> collectTicketPayment(UUID userId, UUID tripId, UUID ticketId,
+                                                              CollectTicketPaymentRequest request) {
+        if (request == null || request.getCollectedAmount() == null || request.getCollectedAmount() <= 0) {
+            throw badRequest("Collected amount must be a positive VND amount");
+        }
+        TripAssignment assignment = findDriverTripForUpdate(userId, tripId);
+        if (assignment.getAssignment_status() != DriverAssignmentStatus.COMPLETED) {
+            requireAcceptedAssignment(assignment);
+        }
+        UUID companyId = assignment.getCompany_id().getId();
+        UUID bookingId = ticketRepository.findBookingIdByTicketAndTrip(companyId, ticketId, tripId)
+                .orElseThrow(() -> notFound("Ticket was not found for this trip"));
+        // Khóa chuyến/phân công trước đơn; khóa đơn cũng bảo vệ trước thao tác hủy của khách.
+        Booking booking = bookingRepository.findByIdAndCompanyIdForUpdate(companyId, bookingId)
+                .orElseThrow(() -> notFound("Booking was not found for this company"));
+        if (!booking.getTrip_id().getId().equals(tripId)) {
+            throw notFound("Booking was not found for this trip");
+        }
+        Ticket ticket = ticketRepository.findByIdAndTripId(ticketId, tripId)
+                .orElseThrow(() -> notFound("Ticket was not found for this trip"));
+        // Trả lại biên nhận cũ khi gửi lặp, kể cả khi trạng thái vé/chuyến đã thay đổi sau đó.
+        if (ticket.getCollected_at() != null) {
+            if (!request.getCollectedAmount().equals(ticket.getCollected_amount())) {
+                throw conflict("Payment was already collected with a different amount");
+            }
+            return success(toTicketResponse(ticket));
+        }
+        TripStatus tripStatus = assignment.getTrip_id().getStatus();
+        if (tripStatus != TripStatus.SCHEDULED && tripStatus != TripStatus.IN_PROGRESS
+                && tripStatus != TripStatus.COMPLETED) {
+            throw conflict("Payment cannot be collected for this trip status");
+        }
+        if (booking.getStatus() != BookingStatus.CONFIRMED || ticket.getStatus() != TicketStatus.CONFIRMED) {
+            throw conflict("Payment can only be collected for a confirmed booking and ticket");
+        }
+        ticket.setCollected_amount(request.getCollectedAmount());
+        ticket.setCollected_at(LocalDateTime.now());
+        ticket.setCollected_by(assignment.getDriver_user_id());
+        return success(toTicketResponse(ticketRepository.save(ticket)));
     }
 
     @Override
@@ -331,6 +397,7 @@ public class DriverServiceImpl implements DriverService {
         DriverTripResponse response = new DriverTripResponse();
         response.setTrip(tripResponseMapper.toTripResponse(assignment.getTrip_id()));
         response.setVehicle(toVehicleResponse(assignment.getVehicle_id()));
+        response.setPassengerCount(ticketRepository.countConfirmedByTripId(assignment.getTrip_id().getId()));
         response.setAssignmentStatus(assignment.getAssignment_status() == null
                 ? DriverAssignmentStatus.ASSIGNED : assignment.getAssignment_status());
         response.setAcceptedAt(assignment.getAccepted_at());
@@ -350,6 +417,9 @@ public class DriverServiceImpl implements DriverService {
         response.setUserId(membership.getUser_id().getId());
         response.setFullName(membership.getUser_id().getFull_name());
         response.setPhone(membership.getUser_id().getPhone());
+        response.setEmail(membership.getUser_id().getEmail());
+        response.setJoinedAt(membership.getJoined_at());
+        response.setLicenseStatus("UNKNOWN");
         response.setStatus(DriverProfileStatus.ACTIVE);
         return response;
     }
@@ -362,10 +432,14 @@ public class DriverServiceImpl implements DriverService {
         response.setUserId(profile.getMembership_id().getUser_id().getId());
         response.setFullName(profile.getMembership_id().getUser_id().getFull_name());
         response.setPhone(profile.getMembership_id().getUser_id().getPhone());
+        response.setEmail(profile.getMembership_id().getUser_id().getEmail());
+        response.setJoinedAt(profile.getMembership_id().getJoined_at());
         response.setEmployeeCode(profile.getEmployee_code());
         response.setLicenseNumber(profile.getLicense_number());
         response.setLicenseClass(profile.getLicense_class());
         response.setLicenseExpiresOn(profile.getLicense_expires_on());
+        response.setLicenseStatus(profile.getLicense_number() == null || profile.getLicense_expires_on() == null
+                ? "UNKNOWN" : profile.getLicense_expires_on().isBefore(LocalDate.now()) ? "EXPIRED" : "VALID");
         response.setStatus(profile.getStatus());
         return response;
     }
@@ -382,6 +456,11 @@ public class DriverServiceImpl implements DriverService {
         response.setPlateNumber(vehicle.getPlate_normalized());
         response.setVehicleModel(vehicle.getVehicle_model());
         response.setPassengerCapacity(vehicle.getPassenger_capacity());
+        response.setInspectionExpiresOn(vehicle.getInspection_expires_on());
+        response.setVehicleType(vehicle.getVehicle_type());
+        response.setManufacturingYear(vehicle.getManufacturing_year());
+        response.setFuelType(vehicle.getFuel_type());
+        response.setColor(vehicle.getColor());
         response.setStatus(vehicle.getStatus());
         response.setCreatedAt(vehicle.getCreated_at());
         response.setUpdatedAt(vehicle.getUpdated_at());
@@ -399,6 +478,10 @@ public class DriverServiceImpl implements DriverService {
         response.setSeatId(ticket.getTrip_seat_id().getId());
         response.setSeatCode(ticket.getSeat_label_snapshot());
         response.setFareAmount(ticket.getFare_amount());
+        response.setPaymentCollected(ticket.getCollected_at() == null ? null : Boolean.TRUE);
+        response.setCollectedAmount(ticket.getCollected_amount());
+        response.setCollectedAt(ticket.getCollected_at());
+        response.setCollectedBy(ticket.getCollected_by() == null ? null : ticket.getCollected_by().getId());
         response.setStatus(ticket.getStatus());
         response.setPassengerTripStatus(ticket.getPassenger_trip_status());
         response.setCreatedAt(ticket.getCreated_at());

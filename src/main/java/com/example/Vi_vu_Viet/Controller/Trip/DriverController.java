@@ -5,9 +5,11 @@ import com.example.Vi_vu_Viet.Service.Trip.DriverService;
 import com.example.Vi_vu_Viet.Util.Enums.PassengerTripStatus;
 import com.example.Vi_vu_Viet.Util.Enums.TripStatus;
 import com.example.Vi_vu_Viet.dto.Request.BaseRequest;
+import com.example.Vi_vu_Viet.dto.Request.Trip.CollectTicketPaymentRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.ReportTripIncidentRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.RejectTripRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.UpdateDriverProfileRequest;
+import com.example.Vi_vu_Viet.dto.Request.Trip.UpdateDriverAssignmentStatusRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.UpdatePassengerTripStatusRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.UpdateTripProgressRequest;
 import com.example.Vi_vu_Viet.dto.Response.BaseResponse;
@@ -38,6 +40,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import java.util.Comparator;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/v1/me")
@@ -57,8 +62,8 @@ public class DriverController {
         return driverService.getDriverProfiles(driver.getId());
     }
 
-    @Operation(summary = "Cập nhật hồ sơ tài xế và giấy phép",
-            description = "companyId xác định hồ sơ tại hãng; các trường không gửi hoặc null được giữ nguyên.")
+    @Operation(summary = "Cập nhật mã nhân viên của tài xế",
+            description = "companyId xác định hồ sơ tại hãng. Thông tin giấy phép chỉ được cập nhật bởi admin hãng.")
     @PatchMapping("/driver-profile")
     public BaseResponse<DriverProfileResponse> updateDriverProfile(
             @Valid @RequestBody BaseRequest<UpdateDriverProfileRequest> request,
@@ -116,6 +121,16 @@ public class DriverController {
         return driverService.updateTripProgress(driver.getId(), tripId, request.getWsRequest());
     }
 
+    @Operation(summary = "Cập nhật trạng thái chuẩn bị hoặc đã có mặt")
+    @PatchMapping("/driver/trips/{trip_id}/assignment-status")
+    public BaseResponse<DriverTripResponse> updateAssignmentStatus(
+            @PathVariable("trip_id") UUID tripId,
+            @Valid @RequestBody BaseRequest<UpdateDriverAssignmentStatusRequest> request,
+            @Parameter(hidden = true) @AuthenticationPrincipal UserAccount driver
+    ) {
+        return driverService.updateAssignmentStatus(driver.getId(), tripId, request.getWsRequest().getStatus());
+    }
+
     @Operation(summary = "Cập nhật trạng thái đón/trả hành khách")
     @PatchMapping("/driver/trips/{trip_id}/passengers/{ticket_id}/status")
     public BaseResponse<TicketResponse> updatePassengerStatus(
@@ -126,6 +141,21 @@ public class DriverController {
     ) {
         PassengerTripStatus status = request.getWsRequest().getStatus();
         return driverService.updatePassengerStatus(driver.getId(), tripId, ticketId, status);
+    }
+
+    @Operation(summary = "Xác nhận đã thu tiền mặt của một vé",
+            description = "Chỉ tài xế đã nhận phân công hiện tại được thao tác. " +
+                    "Vé và đơn phải CONFIRMED, chuyến đang chờ khởi hành, đang chạy hoặc đã hoàn thành. " +
+                    "Gửi lại cùng số tiền trả kết quả đã lưu; số tiền khác trả 409, không cộng dồn. " +
+                    "Thời điểm và người thu do server xác định.")
+    @PostMapping("/driver/trips/{trip_id}/passengers/{ticket_id}/collect-payment")
+    public BaseResponse<TicketResponse> collectTicketPayment(
+            @PathVariable("trip_id") UUID tripId,
+            @PathVariable("ticket_id") UUID ticketId,
+            @Valid @RequestBody BaseRequest<CollectTicketPaymentRequest> request,
+            @Parameter(hidden = true) @AuthenticationPrincipal UserAccount driver
+    ) {
+        return driverService.collectTicketPayment(driver.getId(), tripId, ticketId, request.getWsRequest());
     }
 
     @Operation(summary = "Báo sự cố chuyến")
@@ -144,5 +174,26 @@ public class DriverController {
             @Parameter(hidden = true) @AuthenticationPrincipal UserAccount driver
     ) {
         return driverService.getAssignedVehicle(driver.getId());
+    }
+
+    @Operation(summary = "Lịch sử chuyến gần đây của xe được giao",
+            description = "Gồm chuyến COMPLETED và TERMINATED của tài xế trên xe được giao, mới nhất trước.")
+    @GetMapping("/driver/vehicle/trips/recent")
+    public BaseResponse<List<DriverTripResponse>> getRecentVehicleTrips(
+            @RequestParam(defaultValue = "4") int limit,
+            @Parameter(hidden = true) @AuthenticationPrincipal UserAccount driver
+    ) {
+        if (limit < 1 || limit > 100) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "limit must be between 1 and 100");
+        UUID vehicleId = driverService.getAssignedVehicle(driver.getId()).getWsResponse().getId();
+        List<DriverTripResponse> trips = driverService.getDriverTrips(driver.getId(), null, null, null)
+                .getWsResponse().stream()
+                .filter(item -> vehicleId.equals(item.getVehicle().getId()))
+                .filter(item -> item.getTrip().getStatus() == TripStatus.COMPLETED
+                        || item.getTrip().getStatus() == TripStatus.TERMINATED)
+                .sorted(Comparator.comparing((DriverTripResponse item) -> item.getTrip().getDepartureAt()).reversed())
+                .limit(limit).toList();
+        BaseResponse<List<DriverTripResponse>> response = new BaseResponse<>(com.example.Vi_vu_Viet.Util.ApplicationCode.SUCCESS);
+        response.setWsResponse(trips);
+        return response;
     }
 }

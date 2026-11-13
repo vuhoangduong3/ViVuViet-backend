@@ -167,7 +167,7 @@ public class TripManagementController {
             summary = "Chi tiết chuyến của hãng",
             description = "Thông tin chuyến, lấp ghế, giá vé, xe/tài xế, trạng thái phân công, " +
                     "vé/hành khách, lịch sử trạng thái và các thao tác được phép theo trạng thái. " +
-                    "Chưa có dữ liệu thu tiền: paymentCollected của hành khách là null."
+                    "paymentCollected phản ánh xác nhận thu tiền của tài xế; kèm số tiền, thời điểm và người thu."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lấy chi tiết chuyến thành công"),

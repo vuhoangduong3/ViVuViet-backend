@@ -3,7 +3,9 @@ package com.example.Vi_vu_Viet.Service.Trip;
 import com.example.Vi_vu_Viet.Entity.Auth.UserAccount;
 import com.example.Vi_vu_Viet.Util.Enums.PassengerTripStatus;
 import com.example.Vi_vu_Viet.Util.Enums.TripStatus;
+import com.example.Vi_vu_Viet.Util.Enums.DriverAssignmentStatus;
 import com.example.Vi_vu_Viet.dto.Request.Trip.ReportTripIncidentRequest;
+import com.example.Vi_vu_Viet.dto.Request.Trip.CollectTicketPaymentRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.RejectTripRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.UpdateDriverProfileRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.UpdateTripProgressRequest;
@@ -34,8 +36,13 @@ public interface DriverService {
 
     BaseResponse<DriverTripResponse> updateTripProgress(UUID userId, UUID tripId, UpdateTripProgressRequest request);
 
+    BaseResponse<DriverTripResponse> updateAssignmentStatus(UUID userId, UUID tripId, DriverAssignmentStatus status);
+
     BaseResponse<TicketResponse> updatePassengerStatus(UUID userId, UUID tripId, UUID ticketId,
                                                         PassengerTripStatus status);
+
+    BaseResponse<TicketResponse> collectTicketPayment(UUID userId, UUID tripId, UUID ticketId,
+                                                       CollectTicketPaymentRequest request);
 
     BaseResponse<TripIncidentResponse> reportIncident(UUID userId, UUID tripId,
                                                        ReportTripIncidentRequest request);

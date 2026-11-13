@@ -11,6 +11,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.time.LocalDate;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -39,6 +40,17 @@ public class Vehicle extends BaseEntity {
 
     @Column(name = "passenger_capacity", nullable = false)
     Integer passenger_capacity;
+
+    @Column(name = "inspection_expires_on")
+    LocalDate inspection_expires_on;
+
+    @Column(length = 120)
+    String vehicle_type;
+    Integer manufacturing_year;
+    @Column(length = 80)
+    String fuel_type;
+    @Column(length = 80)
+    String color;
 
     @ToString.Exclude
     @EqualsAndHashCode.Exclude

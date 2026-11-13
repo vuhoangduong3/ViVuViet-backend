@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Data
@@ -16,6 +17,11 @@ public class VehicleResponse {
     String plateNumber;
     String vehicleModel;
     Integer passengerCapacity;
+    LocalDate inspectionExpiresOn;
+    String vehicleType;
+    Integer manufacturingYear;
+    String fuelType;
+    String color;
     UUID seatLayoutId;
     VehicleStatus status;
     LocalDateTime createdAt;

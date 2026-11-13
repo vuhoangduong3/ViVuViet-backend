@@ -12,6 +12,7 @@ import com.example.Vi_vu_Viet.Entity.Trip.Vehicle;
 import com.example.Vi_vu_Viet.Repository.Trip.BusCompanyRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.TripAssignmentRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.VehicleRepository;
+import com.example.Vi_vu_Viet.Repository.Trip.VehicleDocumentRepository;
 import com.example.Vi_vu_Viet.Service.Trip.VehicleService;
 import com.example.Vi_vu_Viet.Util.ApplicationCode;
 import com.example.Vi_vu_Viet.Util.Enums.BusCompanyStatus;
@@ -42,6 +43,7 @@ public class VehicleServiceImpl implements VehicleService {
 
     BusCompanyRepository busCompanyRepository;
     VehicleRepository vehicleRepository;
+    VehicleDocumentRepository vehicleDocumentRepository;
     TripAssignmentRepository tripAssignmentRepository;
     SeatLayoutRepository seatLayoutRepository;
     SeatLayoutSeatRepository seatLayoutSeatRepository;
@@ -137,6 +139,11 @@ public class VehicleServiceImpl implements VehicleService {
         vehicle.setPlate_normalized(plate);
         vehicle.setVehicle_model(request.getVehicleModel().trim());
         vehicle.setPassenger_capacity(request.getPassengerCapacity());
+        vehicle.setInspection_expires_on(request.getInspectionExpiresOn());
+        vehicle.setVehicle_type(request.getVehicleType());
+        vehicle.setManufacturing_year(request.getManufacturingYear());
+        vehicle.setFuel_type(request.getFuelType());
+        vehicle.setColor(request.getColor());
         vehicle.setStatus(VehicleStatus.ACTIVE);
         return success(toResponse(vehicleRepository.save(vehicle)));
     }
@@ -177,6 +184,11 @@ public class VehicleServiceImpl implements VehicleService {
             }
             vehicle.setPassenger_capacity(request.getPassengerCapacity());
         }
+        if (request.getInspectionExpiresOn() != null) vehicle.setInspection_expires_on(request.getInspectionExpiresOn());
+        if (request.getVehicleType() != null) vehicle.setVehicle_type(request.getVehicleType());
+        if (request.getManufacturingYear() != null) vehicle.setManufacturing_year(request.getManufacturingYear());
+        if (request.getFuelType() != null) vehicle.setFuel_type(request.getFuelType());
+        if (request.getColor() != null) vehicle.setColor(request.getColor());
         if (request.getStatus() != null) vehicle.setStatus(request.getStatus());
 
         return success(toResponse(vehicleRepository.save(vehicle)));
@@ -192,6 +204,7 @@ public class VehicleServiceImpl implements VehicleService {
             vehicle.setStatus(VehicleStatus.RETIRED);
             vehicleRepository.save(vehicle);
         } else {
+            vehicleDocumentRepository.deleteAll(vehicleDocumentRepository.findByVehicleId(vehicleId));
             vehicleRepository.delete(vehicle);
         }
         return new BaseResponse<>(ApplicationCode.SUCCESS);
@@ -216,7 +229,9 @@ public class VehicleServiceImpl implements VehicleService {
 
     private boolean hasChanges(UpdateVehicleRequest request) {
         return request.getPlateNumber() != null || request.getVehicleModel() != null
-                || request.getPassengerCapacity() != null || request.getStatus() != null;
+                || request.getPassengerCapacity() != null || request.getInspectionExpiresOn() != null
+                || request.getVehicleType() != null || request.getManufacturingYear() != null
+                || request.getFuelType() != null || request.getColor() != null || request.getStatus() != null;
     }
 
     private VehicleResponse toResponse(Vehicle vehicle) {
@@ -226,6 +241,11 @@ public class VehicleServiceImpl implements VehicleService {
         response.setPlateNumber(vehicle.getPlate_normalized());
         response.setVehicleModel(vehicle.getVehicle_model());
         response.setPassengerCapacity(vehicle.getPassenger_capacity());
+        response.setInspectionExpiresOn(vehicle.getInspection_expires_on());
+        response.setVehicleType(vehicle.getVehicle_type());
+        response.setManufacturingYear(vehicle.getManufacturing_year());
+        response.setFuelType(vehicle.getFuel_type());
+        response.setColor(vehicle.getColor());
         response.setSeatLayoutId(vehicle.getSeat_layout() == null ? null : vehicle.getSeat_layout().getId());
         response.setStatus(vehicle.getStatus());
         response.setCreatedAt(vehicle.getCreated_at());
