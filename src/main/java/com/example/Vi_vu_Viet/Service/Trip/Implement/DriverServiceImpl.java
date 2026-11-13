@@ -7,6 +7,7 @@ import com.example.Vi_vu_Viet.Entity.Trip.TripAssignment;
 import com.example.Vi_vu_Viet.Entity.Trip.TripIncident;
 import com.example.Vi_vu_Viet.Entity.Trip.Ticket;
 import com.example.Vi_vu_Viet.Entity.Trip.Vehicle;
+import com.example.Vi_vu_Viet.Entity.Trip.TripHistoryEvent.Type;
 import com.example.Vi_vu_Viet.Repository.Auth.UserRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.CompanyMemberRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.DriverProfileRepository;
@@ -61,6 +62,7 @@ public class DriverServiceImpl implements DriverService {
     TripIncidentRepository tripIncidentRepository;
     UserRepository userRepository;
     TripResponseMapper tripResponseMapper;
+    TripHistoryRecorder tripHistoryRecorder;
 
     @Override
     @Transactional
@@ -149,6 +151,8 @@ public class DriverServiceImpl implements DriverService {
         assignment.setAssignment_status(DriverAssignmentStatus.ACCEPTED);
         assignment.setAccepted_at(LocalDateTime.now());
         assignment.setRejection_reason(null);
+        tripHistoryRecorder.record(assignment.getTrip_id(), Type.ACCEPTED, null,
+                assignment.getAccepted_at(), assignment.getDriver_user_id());
         tripAssignmentRepository.save(assignment);
         return success(toDriverTripResponse(assignment, true));
     }
@@ -165,6 +169,8 @@ public class DriverServiceImpl implements DriverService {
         }
         assignment.setAssignment_status(DriverAssignmentStatus.REJECTED);
         assignment.setRejection_reason(request.getReason());
+        tripHistoryRecorder.record(assignment.getTrip_id(), Type.REJECTED, request.getReason(),
+                LocalDateTime.now(), assignment.getDriver_user_id());
         tripAssignmentRepository.save(assignment);
         return success(toDriverTripResponse(assignment, false));
     }
@@ -189,6 +195,7 @@ public class DriverServiceImpl implements DriverService {
         if (requested == TripStatus.IN_PROGRESS && current == TripStatus.SCHEDULED) {
             trip.setStatus(TripStatus.IN_PROGRESS);
             trip.setActual_departure_at(actualAt);
+            tripHistoryRecorder.record(trip, Type.STARTED, null, actualAt, assignment.getDriver_user_id());
         } else if (requested == TripStatus.COMPLETED && current == TripStatus.IN_PROGRESS) {
             if (trip.getActual_departure_at() != null && actualAt.isBefore(trip.getActual_departure_at())) {
                 throw badRequest("Arrival time must be after actual departure");
@@ -196,6 +203,7 @@ public class DriverServiceImpl implements DriverService {
             trip.setStatus(TripStatus.COMPLETED);
             trip.setActual_arrival_at(actualAt);
             assignment.setAssignment_status(DriverAssignmentStatus.COMPLETED);
+            tripHistoryRecorder.record(trip, Type.COMPLETED, null, actualAt, assignment.getDriver_user_id());
         } else if (requested != current) {
             throw conflict("Trip status transition is not allowed");
         }

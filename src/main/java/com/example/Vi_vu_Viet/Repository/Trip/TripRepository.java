@@ -29,6 +29,18 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
             "order by trip.departure_at desc, trip.id")
     List<Trip> findAllByCompanyId(@Param("companyId") UUID companyId);
 
+    @Query("select trip from Trip trip " +
+            "join fetch trip.company_id company " +
+            "join fetch trip.route_id route " +
+            "join fetch route.origin_area_id originArea " +
+            "join fetch route.destination_area_id destinationArea " +
+            "where trip.company_id.id = :companyId and trip.status in :statuses " +
+            "order by trip.departure_at desc, trip.id")
+    List<Trip> findAllByCompanyIdAndStatuses(
+            @Param("companyId") UUID companyId,
+            @Param("statuses") Collection<TripStatus> statuses
+    );
+
     @Query("select trip.route_id.id as routeId, count(trip) as tripCount " +
             "from Trip trip " +
             "where trip.company_id.id = :companyId and trip.route_id.id in :routeIds " +

@@ -2,6 +2,7 @@ package com.example.Vi_vu_Viet.Repository.Trip;
 
 import com.example.Vi_vu_Viet.Entity.Trip.Booking;
 import com.example.Vi_vu_Viet.Util.Enums.BookingStatus;
+import com.example.Vi_vu_Viet.Util.Enums.TripStatus;
 import com.example.Vi_vu_Viet.Util.Enums.UserAccountStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
@@ -14,12 +15,111 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, UUID> {
+
+    String COMPANY_SEARCH_WHERE = """
+            where booking.company_id.id = :companyId
+              and (:tripId is null or booking.trip_id.id = :tripId)
+              and (:routeId is null or booking.trip_id.route_id.id = :routeId)
+              and (:customerId is null or booking.customer_user_id.id = :customerId)
+              and (cast(:createdFrom as timestamp) is null or booking.created_at >= :createdFrom)
+              and (cast(:createdTo as timestamp) is null or booking.created_at <= :createdTo)
+              and (cast(:departureFrom as timestamp) is null or booking.trip_id.departure_at >= :departureFrom)
+              and (cast(:departureTo as timestamp) is null or booking.trip_id.departure_at <= :departureTo)
+              and (:status is null
+                   or (booking.status = :status and
+                       (:status <> :holdingStatus or booking.hold_expires_at > :now))
+                   or (:status = :expiredStatus and booking.status = :holdingStatus
+                       and booking.hold_expires_at <= :now))
+              and (:pattern is null
+                   or lower(booking.booking_code) like :pattern escape '!'
+                   or lower(booking.contact_name) like :pattern escape '!'
+                   or lower(booking.contact_phone) like :pattern escape '!'
+                   or lower(booking.contact_email) like :pattern escape '!'
+                   or lower(booking.trip_id.trip_code) like :pattern escape '!'
+                   or lower(booking.trip_id.route_id.code) like :pattern escape '!'
+                   or lower(booking.trip_id.route_id.name) like :pattern escape '!'
+                   or exists (select ticket.id from Ticket ticket
+                       where ticket.booking_id.id = booking.id
+                         and (lower(ticket.ticket_code) like :pattern escape '!'
+                              or lower(ticket.passenger_name) like :pattern escape '!'
+                              or lower(ticket.passenger_phone) like :pattern escape '!')))
+            """;
+
+    @EntityGraph(attributePaths = {"company_id", "trip_id", "trip_id.route_id",
+            "trip_id.route_id.origin_area_id", "trip_id.route_id.destination_area_id"})
+    @Query(value = "select booking from Booking booking " + COMPANY_SEARCH_WHERE +
+            " order by booking.created_at desc, booking.id desc",
+            countQuery = "select count(booking) from Booking booking " + COMPANY_SEARCH_WHERE)
+    Page<Booking> searchByCompanyId(
+            @Param("companyId") UUID companyId,
+            @Param("status") BookingStatus status,
+            @Param("tripId") UUID tripId,
+            @Param("routeId") UUID routeId,
+            @Param("customerId") UUID customerId,
+            @Param("createdFrom") LocalDateTime createdFrom,
+            @Param("createdTo") LocalDateTime createdTo,
+            @Param("departureFrom") LocalDateTime departureFrom,
+            @Param("departureTo") LocalDateTime departureTo,
+            @Param("pattern") String pattern,
+            @Param("holdingStatus") BookingStatus holdingStatus,
+            @Param("expiredStatus") BookingStatus expiredStatus,
+            @Param("now") LocalDateTime now,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {"company_id", "trip_id", "trip_id.route_id",
+            "trip_id.route_id.origin_area_id", "trip_id.route_id.destination_area_id"})
+    @Query("select booking from Booking booking where booking.company_id.id = :companyId " +
+            "and booking.id = :bookingId")
+    Optional<Booking> findByIdAndCompanyId(@Param("companyId") UUID companyId,
+                                          @Param("bookingId") UUID bookingId);
+
+    @Query("select booking.trip_id.id from Booking booking where booking.company_id.id = :companyId " +
+            "and booking.id = :bookingId")
+    Optional<UUID> findTripIdByIdAndCompanyId(@Param("companyId") UUID companyId,
+                                             @Param("bookingId") UUID bookingId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select booking from Booking booking where booking.company_id.id = :companyId " +
+            "and booking.id = :bookingId")
+    Optional<Booking> findByIdAndCompanyIdForUpdate(@Param("companyId") UUID companyId,
+                                                   @Param("bookingId") UUID bookingId);
+
+    @EntityGraph(attributePaths = {"company_id", "trip_id", "trip_id.route_id",
+            "trip_id.route_id.origin_area_id", "trip_id.route_id.destination_area_id"})
+    @Query("select booking from Booking booking where booking.customer_user_id.id = :customerId " +
+            "and booking.trip_id.status in :tripStatuses and booking.status in :bookingStatuses " +
+            "and (booking.status <> :holdingStatus or booking.hold_expires_at > :now) " +
+            "order by booking.created_at desc, booking.id desc")
+    List<Booking> findAllActiveForCustomerTripStatuses(
+            @Param("customerId") UUID customerId,
+            @Param("tripStatuses") Collection<TripStatus> tripStatuses,
+            @Param("bookingStatuses") Collection<BookingStatus> bookingStatuses,
+            @Param("holdingStatus") BookingStatus holdingStatus,
+            @Param("now") LocalDateTime now
+    );
+
+    @EntityGraph(attributePaths = {"company_id", "trip_id", "trip_id.route_id",
+            "trip_id.route_id.origin_area_id", "trip_id.route_id.destination_area_id"})
+    @Query("select booking from Booking booking where booking.customer_user_id.id = :customerId " +
+            "and (booking.status in :cancelledBookingStatuses " +
+            "or (booking.status = :holdingStatus and booking.hold_expires_at <= :now) " +
+            "or booking.trip_id.status in :cancelledTripStatuses) " +
+            "order by booking.created_at desc, booking.id desc")
+    List<Booking> findAllCancelledForCustomer(
+            @Param("customerId") UUID customerId,
+            @Param("cancelledBookingStatuses") Collection<BookingStatus> cancelledBookingStatuses,
+            @Param("holdingStatus") BookingStatus holdingStatus,
+            @Param("now") LocalDateTime now,
+            @Param("cancelledTripStatuses") Collection<TripStatus> cancelledTripStatuses
+    );
 
     String CUSTOMER_SEARCH_WHERE = """
             where booking.customer_user_id.id = :customerId

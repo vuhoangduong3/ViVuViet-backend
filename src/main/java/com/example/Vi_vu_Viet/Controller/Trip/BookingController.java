@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -75,6 +76,46 @@ public class BookingController {
             @Parameter(hidden = true) @AuthenticationPrincipal UserAccount customer
     ) {
         return bookingService.getMyBookings(customer.getId(), status, routeId, q, page, size);
+    }
+
+    @Operation(summary = "Chuyến sắp tới của tôi",
+            description = "Liệt kê toàn bộ đơn của khách đang đăng nhập trên chuyến SCHEDULED, " +
+                    "gồm đơn CONFIRMED hoặc HOLDING còn hạn. Không lọc hãng/ngày và không phân trang.")
+    @GetMapping("/upcoming")
+    public BaseResponse<List<BookingResponse>> getMyUpcomingBookings(
+            @Parameter(hidden = true) @AuthenticationPrincipal UserAccount customer
+    ) {
+        return bookingService.getMyUpcomingBookings(customer.getId());
+    }
+
+    @Operation(summary = "Chuyến đang thực hiện của tôi",
+            description = "Liệt kê toàn bộ đơn CONFIRMED của khách đang đăng nhập trên chuyến IN_PROGRESS. " +
+                    "Không lọc hãng/ngày và không phân trang.")
+    @GetMapping("/in-progress")
+    public BaseResponse<List<BookingResponse>> getMyInProgressBookings(
+            @Parameter(hidden = true) @AuthenticationPrincipal UserAccount customer
+    ) {
+        return bookingService.getMyInProgressBookings(customer.getId());
+    }
+
+    @Operation(summary = "Chuyến hoàn thành của tôi",
+            description = "Liệt kê toàn bộ đơn CONFIRMED của khách đang đăng nhập trên chuyến COMPLETED. " +
+                    "Không lọc hãng/ngày và không phân trang.")
+    @GetMapping("/completed")
+    public BaseResponse<List<BookingResponse>> getMyCompletedBookings(
+            @Parameter(hidden = true) @AuthenticationPrincipal UserAccount customer
+    ) {
+        return bookingService.getMyCompletedBookings(customer.getId());
+    }
+
+    @Operation(summary = "Chuyến đã hủy của tôi",
+            description = "Liệt kê toàn bộ đơn CANCELLED, EXPIRED, HOLDING quá hạn hoặc đơn trên chuyến " +
+                    "CANCELLED/TERMINATED của khách đang đăng nhập. Không lọc hãng/ngày và không phân trang.")
+    @GetMapping("/cancelled")
+    public BaseResponse<List<BookingResponse>> getMyCancelledBookings(
+            @Parameter(hidden = true) @AuthenticationPrincipal UserAccount customer
+    ) {
+        return bookingService.getMyCancelledBookings(customer.getId());
     }
 
     @Operation(summary = "Chi tiết đặt vé của tôi",

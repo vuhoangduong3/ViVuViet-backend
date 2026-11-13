@@ -171,7 +171,7 @@ public class AuthServiceImpl implements AuthService {
         AuthSession session = new AuthSession();
         session.setUser_id(user);
         session.setRefresh_token_hash(TokenUtils.hash(refreshToken));
-        session.setExpires_at(LocalDateTime.now().plusDays(30));
+        session.setExpires_at(LocalDateTime.now().plusDays(90));
         session.setDevice_info(deviceInfo);
         return authSessionRepository.save(session);
     }

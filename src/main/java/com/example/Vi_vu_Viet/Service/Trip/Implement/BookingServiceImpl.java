@@ -181,6 +181,54 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional(readOnly = true)
+    public BaseResponse<List<BookingResponse>> getMyUpcomingBookings(UUID customerId) {
+        return getMyActiveBookingsByTripStatus(customerId, TripStatus.SCHEDULED,
+                List.of(BookingStatus.CONFIRMED, BookingStatus.HOLDING));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BaseResponse<List<BookingResponse>> getMyInProgressBookings(UUID customerId) {
+        return getMyActiveBookingsByTripStatus(customerId, TripStatus.IN_PROGRESS, List.of(BookingStatus.CONFIRMED));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BaseResponse<List<BookingResponse>> getMyCompletedBookings(UUID customerId) {
+        return getMyActiveBookingsByTripStatus(customerId, TripStatus.COMPLETED, List.of(BookingStatus.CONFIRMED));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BaseResponse<List<BookingResponse>> getMyCancelledBookings(UUID customerId) {
+        LocalDateTime now = LocalDateTime.now();
+        List<Booking> bookings = bookingRepository.findAllCancelledForCustomer(customerId,
+                List.of(BookingStatus.CANCELLED, BookingStatus.EXPIRED), BookingStatus.HOLDING, now,
+                List.of(TripStatus.CANCELLED, TripStatus.TERMINATED));
+        return toMyBookingListResponse(bookings, now);
+    }
+
+    private BaseResponse<List<BookingResponse>> getMyActiveBookingsByTripStatus(
+            UUID customerId, TripStatus tripStatus, List<BookingStatus> bookingStatuses) {
+        LocalDateTime now = LocalDateTime.now();
+        List<Booking> bookings = bookingRepository.findAllActiveForCustomerTripStatuses(customerId,
+                List.of(tripStatus), bookingStatuses, BookingStatus.HOLDING, now);
+        return toMyBookingListResponse(bookings, now);
+    }
+
+    private BaseResponse<List<BookingResponse>> toMyBookingListResponse(List<Booking> bookings, LocalDateTime now) {
+        List<UUID> bookingIds = bookings.stream().map(Booking::getId).toList();
+        Map<UUID, List<Ticket>> ticketsByBooking = bookingIds.isEmpty() ? Map.of()
+                : ticketRepository.findAllByBookingIds(bookingIds).stream()
+                    .collect(Collectors.groupingBy(ticket -> ticket.getBooking_id().getId()));
+        BaseResponse<List<BookingResponse>> response = new BaseResponse<>(ApplicationCode.SUCCESS);
+        response.setWsResponse(bookings.stream().map(booking -> toBookingResponse(
+                booking, ticketsByBooking.getOrDefault(booking.getId(), List.of()), now)).toList());
+        return response;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public BaseResponse<BookingResponse> getMyBooking(UUID customerId, UUID bookingId) {
         Booking booking = getOwnedBooking(customerId, bookingId);
         return success(toBookingResponse(booking, ticketRepository.findAllByBookingId(bookingId)));

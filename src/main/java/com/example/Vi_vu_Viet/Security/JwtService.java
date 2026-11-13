@@ -18,7 +18,7 @@ import java.util.UUID;
 @Service
 public class JwtService {
 
-    private static final long ACCESS_TOKEN_SECONDS = 900;
+    private static final long ACCESS_TOKEN_SECONDS = 86_400;
     private static final String JWT_HEADER = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
 
     private final JsonMapper jsonMapper;

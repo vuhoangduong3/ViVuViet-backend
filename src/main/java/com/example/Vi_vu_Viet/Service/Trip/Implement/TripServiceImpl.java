@@ -10,6 +10,7 @@ import com.example.Vi_vu_Viet.Entity.Trip.TripAssignment;
 import com.example.Vi_vu_Viet.Entity.Trip.Booking;
 import com.example.Vi_vu_Viet.Entity.Trip.Ticket;
 import com.example.Vi_vu_Viet.Entity.Trip.Vehicle;
+import com.example.Vi_vu_Viet.Entity.Trip.TripHistoryEvent.Type;
 import com.example.Vi_vu_Viet.Repository.Auth.UserRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.BusCompanyRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.RouteRepository;
@@ -42,6 +43,7 @@ import com.example.Vi_vu_Viet.dto.Request.Trip.CancelTripRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.UpdateTripRequest;
 import com.example.Vi_vu_Viet.dto.Response.BaseResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripResponse;
+import com.example.Vi_vu_Viet.dto.Response.Trip.TripDetailResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripAssignmentResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripPassengerBookingResponse;
 import com.example.Vi_vu_Viet.dto.Response.Booking.TicketResponse;
@@ -82,6 +84,8 @@ public class TripServiceImpl implements TripService {
     VehicleRepository vehicleRepository;
     SeatLayoutSeatRepository seatLayoutSeatRepository;
     TripIncidentRepository tripIncidentRepository;
+    TripDetailAssembler tripDetailAssembler;
+    TripHistoryRecorder tripHistoryRecorder;
 
     @Override
     @Transactional(readOnly = true)
@@ -102,6 +106,37 @@ public class TripServiceImpl implements TripService {
                 .map(tripResponseMapper::toTripResponse)
                 .toList();
         return success(trips);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BaseResponse<List<TripResponse>> getUpcomingTrips(UUID companyId) {
+        return getCompanyTripsByStatuses(companyId, List.of(TripStatus.SCHEDULED));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BaseResponse<List<TripResponse>> getInProgressTrips(UUID companyId) {
+        return getCompanyTripsByStatuses(companyId, List.of(TripStatus.IN_PROGRESS));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BaseResponse<List<TripResponse>> getCompletedTrips(UUID companyId) {
+        return getCompanyTripsByStatuses(companyId, List.of(TripStatus.COMPLETED));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BaseResponse<List<TripResponse>> getCancelledTrips(UUID companyId) {
+        return getCompanyTripsByStatuses(companyId, List.of(TripStatus.CANCELLED, TripStatus.TERMINATED));
+    }
+
+    private BaseResponse<List<TripResponse>> getCompanyTripsByStatuses(UUID companyId, List<TripStatus> statuses) {
+        getActiveCompany(companyId);
+        return success(tripRepository.findAllByCompanyIdAndStatuses(companyId, statuses).stream()
+                .map(tripResponseMapper::toTripResponse)
+                .toList());
     }
 
     @Override
@@ -191,7 +226,11 @@ public class TripServiceImpl implements TripService {
         assignment.setAssignment_status(DriverAssignmentStatus.ASSIGNED);
         assignment.setAccepted_at(null);
         assignment.setRejection_reason(null);
-        return successAssignment(toAssignmentResponse(tripAssignmentRepository.save(assignment)));
+        tripAssignmentRepository.save(assignment);
+        tripHistoryRecorder.record(trip, Type.ASSIGNED,
+                vehicle.getPlate_normalized() + " · " + driver.getFull_name(),
+                assignment.getAssigned_at(), assignment.getAssigned_by());
+        return successAssignment(toAssignmentResponse(assignment));
     }
 
     @Override
@@ -219,14 +258,16 @@ public class TripServiceImpl implements TripService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.UNAUTHORIZED, "Authenticated user was not found")));
 
-        return success(tripResponseMapper.toTripResponse(tripRepository.save(trip)));
+        tripRepository.saveAndFlush(trip);
+        tripHistoryRecorder.record(trip, Type.CREATED, null, trip.getCreated_at(), trip.getCreated_by());
+        return success(tripResponseMapper.toTripResponse(trip));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public BaseResponse<TripResponse> getCompanyTrip(UUID companyId, UUID tripId) {
+    public BaseResponse<TripDetailResponse> getCompanyTrip(UUID companyId, UUID tripId) {
         getActiveCompany(companyId);
-        return success(tripResponseMapper.toTripResponse(getCompanyTripEntity(companyId, tripId)));
+        return success(tripDetailAssembler.toDetail(getCompanyTripEntity(companyId, tripId)));
     }
 
     @Override
@@ -293,6 +334,7 @@ public class TripServiceImpl implements TripService {
 
         trip.setStatus(TripStatus.SCHEDULED);
         trip.setSales_status(TripSalesStatus.OPEN);
+        tripHistoryRecorder.record(trip, Type.PUBLISHED, "Khách bắt đầu đặt vé", LocalDateTime.now());
         return success(tripResponseMapper.toTripResponse(tripRepository.save(trip)));
     }
 
@@ -338,6 +380,7 @@ public class TripServiceImpl implements TripService {
         trip.setCancelled_at(now);
         trip.setCancellation_reason(request.getReason());
         trip.setCancellation_description(request.getDescription());
+        tripHistoryRecorder.record(trip, Type.CANCELLED, request.getReason(), now);
         return success(tripResponseMapper.toTripResponse(tripRepository.save(trip)));
     }
 
@@ -359,6 +402,7 @@ public class TripServiceImpl implements TripService {
         }
         tripAssignmentRepository.deleteByCompanyAndTrip(companyId, tripId);
         tripSeatRepository.deleteByCompanyAndTrip(companyId, tripId);
+        tripHistoryRecorder.deleteForTrip(trip);
         tripRepository.delete(trip);
         tripRepository.flush();
         return new BaseResponse<>(ApplicationCode.SUCCESS);
@@ -468,8 +512,8 @@ public class TripServiceImpl implements TripService {
                 || request.getExpectedArrivalAt() != null || request.getBookingCutoffAt() != null;
     }
 
-    private BaseResponse<TripResponse> success(TripResponse tripResponse) {
-        BaseResponse<TripResponse> response = new BaseResponse<>(ApplicationCode.SUCCESS);
+    private <T extends TripResponse> BaseResponse<T> success(T tripResponse) {
+        BaseResponse<T> response = new BaseResponse<>(ApplicationCode.SUCCESS);
         response.setWsResponse(tripResponse);
         return response;
     }

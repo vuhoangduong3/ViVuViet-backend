@@ -125,6 +125,25 @@ Các API danh sách, chi tiết, tạo và cập nhật tuyến tại `/api/v1/b
 
 API đặt vé yêu cầu đăng nhập. Ghế được giữ trong 5 phút; khách cần xác nhận trước khi hết hạn. Thanh toán chưa được tích hợp.
 
+### Danh sách chuyến theo nhóm trạng thái của hãng
+
+Bốn API yêu cầu Bearer token và quyền `COMPANY_ADMIN` của đúng hãng trong URL.
+Prefix: `/api/v1/bus-companies/{company_id}/trips`.
+
+| Method | Endpoint | Trạng thái được liệt kê |
+| --- | --- | --- |
+| GET | `/upcoming` | Sắp tới: chỉ `SCHEDULED`, không gồm `DRAFT` |
+| GET | `/in-progress` | Đang thực hiện: `IN_PROGRESS` |
+| GET | `/completed` | Hoàn thành: `COMPLETED` |
+| GET | `/cancelled` | Đã hủy: `CANCELLED`, `TERMINATED` |
+
+Mỗi API trả toàn bộ chuyến của hãng thuộc nhóm tương ứng trong `wsResponse` (mảng `TripResponse`),
+không lọc theo ngày, tuyến, trạng thái mở bán và không phân trang hay giới hạn số lượng.
+Nhóm được xác định bằng trạng thái lưu trong DB, không suy ra từ giờ khởi hành.
+Kết quả sắp xếp `departureAt` giảm dần, sau đó theo ID; không có chuyến trả `[]`.
+Chưa đăng nhập trả `401`, không có quyền với hãng trả `403`, hãng không hoạt động trả `404`.
+API `GET` tại prefix vẫn phục vụ tab Tất cả và các bộ lọc cũ (bao gồm cả chuyến nháp).
+
 ### Hủy và xóa chuyến của hãng
 
 Hai API yêu cầu Bearer token và quyền `COMPANY_ADMIN` của hãng trong URL:
@@ -148,6 +167,30 @@ Body hủy chuyến:
 `reason` bắt buộc, tối đa 500 ký tự; `description` tùy chọn, tối đa 2000 ký tự. Chỉ hủy chuyến `DRAFT` hoặc `SCHEDULED` chưa có giờ khởi hành thực tế; các trạng thái đang chạy/đã kết thúc trả `409`. Chuyến chuyển sang `CANCELLED`, đóng bán (`CLOSED`), lưu `cancelledAt`, `cancellationReason`, `cancellationDescription` trong response. Đặt chỗ/vé `HOLDING` còn hạn và `CONFIRMED` chuyển sang `CANCELLED`; giữ chỗ quá hạn chuyển sang `EXPIRED`. Lịch sử vé/đặt chỗ, phân công và ghế vẫn giữ nguyên; chưa có xử lý hoàn tiền. Gọi lại API hủy cho chuyến đã hủy trả kết quả hiện có, không ghi đè lý do hoặc thời điểm hủy ban đầu.
 
 API xóa không cần body, chỉ cho phép chuyến `DRAFT` đang đóng bán, chưa có bất kỳ lịch sử đặt chỗ/vé (kể cả đã hủy hoặc hết hạn) hoặc sự cố nào. Khi xóa, BE dọn phân công và ghế chụp trước khi xóa chuyến; các trường hợp không đủ điều kiện trả `409`. Hãng không hoạt động hoặc chuyến không thuộc hãng trả `404`; không có quyền quản lý hãng trả `403`. Hủy chuyến giữ nguyên `tripCount` của tuyến; xóa chuyến làm giảm số đếm này. FE cần làm mới cache tuyến và chuyến sau thao tác, đồng thời làm mới dữ liệu đặt vé nếu hủy chuyến.
+
+### Chuyến của tôi theo nhóm trạng thái (khách hàng)
+
+Bốn API `GET` dưới prefix `/api/v1/me/bookings` yêu cầu Bearer token và quyền `ROLE_CUSTOMER`.
+ID khách lấy từ phiên đăng nhập; không nhận ID khách từ request.
+
+| Endpoint | Điều kiện liệt kê |
+| --- | --- |
+| `/upcoming` | Chuyến `SCHEDULED`, đơn `CONFIRMED` hoặc `HOLDING` còn hạn; không gồm chuyến `DRAFT` |
+| `/in-progress` | Chuyến `IN_PROGRESS`, đơn `CONFIRMED` |
+| `/completed` | Chuyến `COMPLETED`, đơn `CONFIRMED` |
+| `/cancelled` | Đơn `CANCELLED`/`EXPIRED`, đơn `HOLDING` quá hạn hoặc chuyến `CANCELLED`/`TERMINATED` |
+
+Mỗi API trả toàn bộ đơn phù hợp của khách ở tất cả hãng, không lọc ngày và không phân trang.
+`wsResponse` là mảng `BookingResponse` gồm chuyến, hãng và đầy đủ vé/hành khách của từng đơn;
+một khách đặt nhiều đơn trên cùng chuyến sẽ nhận các đơn riêng. Không có kết quả trả `[]`.
+Sắp xếp thời gian tạo đơn giảm dần, sau đó ID giảm dần, giống API danh sách cũ.
+Đơn hủy/hết hạn được ưu tiên vào nhóm đã hủy, kể cả khi chuyến vẫn sắp tới/đang chạy/đã hoàn thành.
+Đơn `HOLDING` có `holdExpiresAt <= now` được trả với trạng thái hiệu lực `EXPIRED`;
+các API chỉ đọc này không cập nhật DB hoặc thay đổi cơ chế giữ ghế hiện tại.
+Chưa đăng nhập trả `401`; tài khoản không có quyền khách hàng trả `403`.
+API danh sách có phân trang `GET /api/v1/me/bookings` và các API chi tiết/tạo/xác nhận/hủy vẫn giữ nguyên.
+FE khách hàng cần nối bốn API mới theo tab; khi nối, `TERMINATED` thuộc nhóm đã hủy,
+thay vì được mapper FE hiện tại coi là hoàn thành.
 
 ### Luồng API đặt vé
 
@@ -314,6 +357,140 @@ Danh sách/chi tiết trả `driverId`, `companyId`, `profileId`, `fullName`, `p
 Danh sách tài xế và chuyến trả theo `PageResponse` trong `wsResponse`: `content`, `page`, `size`, `totalElements`, `totalPages`, `first`, `last`. `page >= 0`, `size` từ 1 đến 100. Mỗi chuyến có `tripId`, `tripCode`, `routeName`, `departureAt`, `expectedArrivalAt`, `status`, `assignmentStatus`, `assignedAt`. FE ánh xạ `SCHEDULED` → sắp tới, `IN_PROGRESS` → đang chạy, `COMPLETED` → hoàn thành, `CANCELLED`/`TERMINATED` → đã hủy; `DRAFT` là chuyến nháp. Chuyến bị hủy vẫn có trong lịch sử; phân công bị từ chối/thay thế được bỏ.
 
 Thông tin cá nhân và mật khẩu thuộc tài khoản dùng chung. Để tránh sửa danh tính/chiếm quyền tài khoản ngoài phạm vi hãng, API trả `403` nếu admin đổi thông tin cá nhân hoặc reset mật khẩu của tài khoản có quyền `COMPANY_ADMIN` hay membership ở hãng khác. Admin vẫn quản lý GPLX và trạng thái hồ sơ riêng tại hãng. Endpoint tạo chỉ tạo tài khoản mới; SĐT/email đã đăng ký trả `409`.
+
+## API chi tiết chuyến cho admin hãng
+
+`GET /api/v1/bus-companies/{company_id}/trips/{trip_id}` yêu cầu Bearer token và
+quyền `COMPANY_ADMIN` tại đúng hãng. `wsResponse` là `TripDetailResponse`, giữ các trường
+`TripResponse` đang có ở cấp ngoài cùng và bổ sung dữ liệu cho ngăn chi tiết chuyến:
+
+| Khối trên FE | Trường trong response |
+| --- | --- |
+| Tiêu đề, tuyến, ngày giờ, trạng thái, giá vé | `tripCode`, `originAreaName`, `destinationAreaName`, `departureAt`, `expectedArrivalAt`, `status`, `salesStatus`, `baseFareAmount`, `currency`, `timezone` |
+| Lấp ghế | `seats.totalSeats`, `confirmedSeats`, `heldSeats`, `occupiedSeats`, `availableSeats`, `occupancyRate` |
+| Tài xế | `assignment.driverId`, `driverName`, `driverPhone` |
+| Xe | `assignment.vehicleId`, `plateNumber`, `vehicleModel`, `passengerCapacity` |
+| Phân công và tiến trình nhận lệnh | `assignment.assignmentStatus`, `active`, `assignedAt`, `acceptedAt`, `rejectionReason`, `assignedBy`, `assignedByName`; kết hợp `status` để hiển thị đang chạy/hoàn thành |
+| Hành khách và vé | `ticketCount`, `activeTicketCount`, `passengers[]` |
+| Lịch sử trạng thái | `history[]`, `historyComplete` |
+| Nút thao tác | `actions.canEdit`, `canAssign`, `canPublish`, `canCancel` |
+
+Các trường trong bảng thuộc cùng object đứng trước: ví dụ toàn bộ số ghế nằm trong `seats`,
+thông tin xe/tài xế và trạng thái phân công nằm trong `assignment`.
+
+`totalSeats` lấy từ ghế chụp của chuyến, không lấy sức chứa hiện tại của xe.
+`confirmedSeats` là số ghế có vé và đơn `CONFIRMED`; `heldSeats` là ghế đang được giữ còn hạn.
+`occupiedSeats` đếm số ID ghế khác nhau trong hai nhóm; `availableSeats = totalSeats - occupiedSeats`.
+`occupancyRate` là phần trăm, làm tròn một chữ số thập phân (0 nếu chưa có inventory ghế).
+Vé hủy/hết hạn và đơn `HOLDING` đã quá hạn không chiếm ghế. FE hiển thị
+`occupiedSeats / totalSeats` cho thanh lấp ghế. `assignment` là `null` nếu chưa phân công;
+`assignment.active = false` khi phân công đã bị từ chối/thay thế.
+
+Mỗi phần tử `passengers` giữ toàn bộ trường của `TicketResponse`:
+`id`, `ticketCode`, `passengerName`, `passengerPhone`, `pickupAddress`, `dropoffAddress`,
+`seatId`, `seatCode`, `fareAmount`, `status`, `passengerTripStatus`, `createdAt`;
+bổ sung `bookingId`, `bookingCode`, `bookingStatus`, `contactName`, `contactPhone`, `paymentCollected`.
+Nếu `passengerPhone` là null, FE có thể hiển thị `contactPhone`.
+`ticketCount` tính cả vé đã hủy/hết hạn; `activeTicketCount` chỉ tính vé còn hiệu lực.
+`paymentCollected` hiện luôn là `null` vì hệ thống chưa lưu tiền thực thu. FE không được
+hiển thị “Đã thu” chỉ dựa vào `CONFIRMED`; trạng thái này chỉ xác nhận việc đặt vé.
+
+`history[]` có `eventType`, `title`, `occurredAt`, `expectedAt`, `actorId`, `actorName`,
+`description`, `state`. Các sự kiện đã xảy ra có `state = DONE`, sắp theo thời gian tăng dần.
+Mốc `EXPECTED_DEPARTURE` có `state = PENDING`, `occurredAt = null`,
+`expectedAt = departureAt`, chỉ có ở chuyến đang chờ khởi hành.
+Tạo/phân công/công bố/nhận hoặc từ chối lệnh/khởi hành/hoàn thành/hủy chuyến được ghi vào
+bảng mới `trip_history_events` trong cùng transaction với thao tác gốc.
+Tên người thao tác và mô tả xe/tài xế được lưu tại thời điểm sự kiện; phân công lại không mất mốc cũ.
+Chuyến cũ có `historyComplete = false`: chỉ dựng lại mốc có timestamp thật từ dữ liệu đang lưu,
+không đoán giờ công bố hoặc bổ sung sự kiện chưa từng được lưu. Các mốc dựng lại dùng tên tài khoản hiện tại nếu còn có liên kết.
+Xóa chuyến nháp đủ điều kiện sẽ xóa cả lịch sử của chuyến đó.
+
+Các cờ `actions` dựa trên quy tắc trạng thái hiện tại của backend:
+chỉ sửa/công bố chuyến nháp đang đóng bán; chỉ hủy khi chưa khởi hành;
+phân công được phép khi chuyến chưa hoàn thành/hủy/kết thúc sớm.
+Mutation tiếp tục kiểm tra các điều kiện chi tiết (xung đột lịch, sơ đồ ghế, giá vé, thời hạn nhận đặt).
+Các API danh sách, tạo/sửa/công bố/hủy và API public vẫn giữ `TripResponse` như trước.
+FE muốn lấy đầy đủ dữ liệu trên bằng một request cần dùng response của API chi tiết mới.
+
+## API admin quản lý đơn đặt vé toàn hãng
+
+Tiền tố: `/api/v1/bus-companies/{company_id}/bookings`. Cả ba API yêu cầu Bearer token và quyền
+`COMPANY_ADMIN` của đúng hãng đang hoạt động. Đơn không tồn tại hoặc thuộc hãng khác đều trả `404`.
+Response giữ envelope `{ code, message, wsResponse }`.
+
+| Method | Phần sau tiền tố | Chức năng |
+| --- | --- | --- |
+| GET | (rỗng) | Tìm kiếm, lọc và phân trang đơn toàn hãng |
+| GET | `/{booking_id}` | Chi tiết đơn, chuyến và toàn bộ vé/hành khách |
+| POST | `/{booking_id}/cancel` | Hủy đơn, lưu lý do và tài khoản thực hiện |
+
+### Danh sách đơn
+
+Các query parameter đều tùy chọn và được kết hợp với nhau:
+
+| Tham số | Quy tắc |
+| --- | --- |
+| `q` | Tối đa 200 ký tự; tìm mã đơn/vé/chuyến/tuyến, tên tuyến, tên/SĐT/email liên hệ hoặc tên/SĐT hành khách |
+| `status` | `HOLDING`, `CONFIRMED`, `CANCELLED`, `EXPIRED` |
+| `tripId`, `routeId`, `customerId` | UUID; chỉ tìm trong các đơn thuộc hãng ở URL |
+| `createdFrom`, `createdTo` | Khoảng thời gian tạo, ISO local datetime, bao gồm hai đầu |
+| `departureFrom`, `departureTo` | Khoảng giờ khởi hành, ISO local datetime theo múi giờ hãng, bao gồm hai đầu |
+| `page` | Bắt đầu từ 0, mặc định `0` |
+| `size` | Từ 1 đến 100, mặc định `20` |
+
+Ví dụ: `GET /api/v1/bus-companies/{company_id}/bookings?status=CONFIRMED&q=BK&page=0&size=20`.
+Khoảng thời gian có đầu lớn hơn cuối hoặc tham số không hợp lệ trả `400`.
+Tìm kiếm không phân biệt hoa/thường, bỏ khoảng trắng đầu/cuối và tìm `%`, `_`, `!` như ký tự thường.
+Đơn `HOLDING` đã quá hạn được tính là `EXPIRED` ngay trong bộ lọc và response.
+Sắp xếp theo `createdAt` giảm dần, rồi ID giảm dần.
+
+`wsResponse` có `content`, `page`, `size`, `totalElements`, `totalPages`, `first`, `last`.
+Trang vượt tổng số kết quả trả `content: []`, giữ đúng tổng số đơn phù hợp bộ lọc.
+Mỗi phần tử `content` là `CompanyBookingSummaryResponse`:
+
+| Nhóm | Trường |
+| --- | --- |
+| Đơn và người đặt | `id`, `bookingCode`, `companyId`, `customerId`, `contactName`, `contactPhone`, `contactEmail` |
+| Chuyến | `tripId`, `tripCode`, `tripStatus`, `departureAt`, `expectedArrivalAt`, `timezone` |
+| Tuyến | `routeId`, `routeName`, `originAreaName`, `destinationAreaName` |
+| Vé và giá | `ticketCount`, `seatCodes`, `quotedTotalAmount`, `currency` |
+| Trạng thái và thời gian | `status`, `holdExpiresAt`, `createdAt`, `confirmedAt`, `cancelledAt`, `updatedAt` |
+
+`ticketCount` và `seatCodes` gồm toàn bộ vé của đơn, kể cả vé đã hủy/hết hạn; mã ghế và giá là dữ liệu lúc đặt.
+Danh sách không nhúng toàn bộ thông tin hành khách; FE gọi API chi tiết khi mở một đơn.
+
+### Chi tiết và hủy đơn
+
+API chi tiết và API hủy trả cùng `CompanyBookingResponse`: toàn bộ trường của `BookingResponse`
+ở mục “Dữ liệu cho màn Xem vé”, bổ sung `companyId`, `customerId`, `cancellationReason`, `cancelledBy`.
+`trip` giữ cấu trúc `BookingTripResponse`; `tickets` giữ cấu trúc `TicketResponse`,
+bao gồm cả `passengerTripStatus`. Các trường tùy chọn như `contactEmail`, `confirmedAt`,
+`cancelledAt`, `cancellationReason`, `cancelledBy`, `tickets[].passengerPhone` có thể là `null`.
+Không suy ra trạng thái thanh toán từ `CONFIRMED`.
+
+Body hủy đơn:
+
+```json
+{
+  "wsRequest": {
+    "reason": "Khách yêu cầu hủy vé"
+  }
+}
+```
+
+`reason` bắt buộc, bỏ khoảng trắng đầu/cuối, tối đa 500 ký tự. Chỉ hủy đơn `HOLDING` còn hạn
+hoặc `CONFIRMED` trên chuyến `DRAFT`/`SCHEDULED` chưa có `actualDepartureAt`.
+Hủy cập nhật trạng thái đơn và các vé còn hiệu lực sang `CANCELLED`, giải phóng ghế,
+lưu `cancelledAt`, `cancellationReason` và `cancelledBy` (ID admin lấy từ token).
+Gọi lại đơn đã hủy vẫn thành công và giữ nguyên thông tin hủy ban đầu.
+Đơn hết hạn hoặc chuyến đã bắt đầu/kết thúc trả `409`; đơn giữ ghế quá hạn được chuyển sang `EXPIRED` cùng các vé đang giữ.
+Khóa chuyến trước đơn trong transaction để phối hợp với tạo đơn, hủy chuyến và cập nhật hành trình.
+
+Entity `Booking` bổ sung các cột nullable `cancellation_reason`, `cancelled_by` (FK tài khoản),
+và index `(company_id, created_at)`. Cấu hình hiện tại `spring.jpa.hibernate.ddl-auto=update`
+sẽ cập nhật schema khi khởi động backend. Hai trường truy vết hủy có thể `null` với dữ liệu cũ
+hoặc đơn được hủy qua luồng khách hàng/hủy cả chuyến.
 
 ## Kiểm thử
 

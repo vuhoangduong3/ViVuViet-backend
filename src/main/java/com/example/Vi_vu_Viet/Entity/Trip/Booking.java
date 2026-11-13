@@ -31,6 +31,7 @@ import java.time.LocalDateTime;
                 columnNames = {"company_id", "booking_code"}
         ),
         indexes = {
+                @Index(name = "ix_bookings_company_created", columnList = "company_id, created_at"),
                 @Index(name = "ix_bookings_customer_created", columnList = "customer_user_id, created_at"),
                 @Index(name = "ix_bookings_trip_status", columnList = "trip_id, status, hold_expires_at")
         }
@@ -86,4 +87,13 @@ public class Booking extends BaseEntity {
 
     @Column(name = "cancelled_at")
     LocalDateTime cancelled_at;
+
+    @Column(name = "cancellation_reason", length = 500)
+    String cancellation_reason;
+
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cancelled_by")
+    UserAccount cancelled_by;
 }

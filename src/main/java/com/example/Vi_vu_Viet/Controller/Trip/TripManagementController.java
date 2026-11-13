@@ -9,6 +9,7 @@ import com.example.Vi_vu_Viet.dto.Request.Trip.CancelTripRequest;
 import com.example.Vi_vu_Viet.dto.Request.Trip.UpdateTripRequest;
 import com.example.Vi_vu_Viet.dto.Response.BaseResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripResponse;
+import com.example.Vi_vu_Viet.dto.Response.Trip.TripDetailResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripAssignmentResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripPassengerBookingResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -72,6 +73,46 @@ public class TripManagementController {
         return tripService.getCompanyTrips(companyId, date, status, routeId, assignmentStatus);
     }
 
+    @Operation(summary = "Danh sách chuyến sắp tới của hãng",
+            description = "Liệt kê toàn bộ chuyến SCHEDULED của hãng, không gồm DRAFT. " +
+                    "Không lọc ngày, không phân trang; sắp xếp giờ khởi hành giảm dần.")
+    @GetMapping("/upcoming")
+    public BaseResponse<List<TripResponse>> getUpcomingTrips(
+            @PathVariable("company_id") UUID companyId
+    ) {
+        return tripService.getUpcomingTrips(companyId);
+    }
+
+    @Operation(summary = "Danh sách chuyến đang thực hiện của hãng",
+            description = "Liệt kê toàn bộ chuyến IN_PROGRESS của hãng. " +
+                    "Không lọc ngày, không phân trang; sắp xếp giờ khởi hành giảm dần.")
+    @GetMapping("/in-progress")
+    public BaseResponse<List<TripResponse>> getInProgressTrips(
+            @PathVariable("company_id") UUID companyId
+    ) {
+        return tripService.getInProgressTrips(companyId);
+    }
+
+    @Operation(summary = "Danh sách chuyến hoàn thành của hãng",
+            description = "Liệt kê toàn bộ chuyến COMPLETED của hãng. " +
+                    "Không lọc ngày, không phân trang; sắp xếp giờ khởi hành giảm dần.")
+    @GetMapping("/completed")
+    public BaseResponse<List<TripResponse>> getCompletedTrips(
+            @PathVariable("company_id") UUID companyId
+    ) {
+        return tripService.getCompletedTrips(companyId);
+    }
+
+    @Operation(summary = "Danh sách chuyến đã hủy của hãng",
+            description = "Liệt kê toàn bộ chuyến CANCELLED hoặc TERMINATED của hãng. " +
+                    "Không lọc ngày, không phân trang; sắp xếp giờ khởi hành giảm dần.")
+    @GetMapping("/cancelled")
+    public BaseResponse<List<TripResponse>> getCancelledTrips(
+            @PathVariable("company_id") UUID companyId
+    ) {
+        return tripService.getCancelledTrips(companyId);
+    }
+
     @Operation(summary = "Danh sách đặt vé và hành khách của chuyến")
     @GetMapping("/{trip_id}/bookings")
     public BaseResponse<List<TripPassengerBookingResponse>> getTripBookings(
@@ -124,7 +165,9 @@ public class TripManagementController {
 
     @Operation(
             summary = "Chi tiết chuyến của hãng",
-            description = "Lấy chi tiết chuyến cùng khu vực đầu và cuối của tuyến."
+            description = "Thông tin chuyến, lấp ghế, giá vé, xe/tài xế, trạng thái phân công, " +
+                    "vé/hành khách, lịch sử trạng thái và các thao tác được phép theo trạng thái. " +
+                    "Chưa có dữ liệu thu tiền: paymentCollected của hành khách là null."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lấy chi tiết chuyến thành công"),
@@ -133,7 +176,7 @@ public class TripManagementController {
             @ApiResponse(responseCode = "404", description = "Không tìm thấy chuyến trong hãng này")
     })
     @GetMapping("/{trip_id}")
-    public BaseResponse<TripResponse> getCompanyTrip(
+    public BaseResponse<TripDetailResponse> getCompanyTrip(
             @Parameter(description = "ID hãng xe")
             @PathVariable("company_id") UUID companyId,
             @Parameter(description = "ID chuyến")

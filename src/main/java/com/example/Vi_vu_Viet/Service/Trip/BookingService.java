@@ -20,6 +20,14 @@ public interface BookingService {
     BaseResponse<PageResponse<BookingResponse>> getMyBookings(
             UUID customerId, BookingStatus status, UUID routeId, String q, int page, int size);
 
+    BaseResponse<List<BookingResponse>> getMyUpcomingBookings(UUID customerId);
+
+    BaseResponse<List<BookingResponse>> getMyInProgressBookings(UUID customerId);
+
+    BaseResponse<List<BookingResponse>> getMyCompletedBookings(UUID customerId);
+
+    BaseResponse<List<BookingResponse>> getMyCancelledBookings(UUID customerId);
+
     BaseResponse<BookingResponse> getMyBooking(UUID customerId, UUID bookingId);
 
     BaseResponse<BookingResponse> confirmBooking(UUID customerId, UUID bookingId);

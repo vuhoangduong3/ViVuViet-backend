@@ -52,7 +52,7 @@ public interface TripAssignmentRepository extends JpaRepository<TripAssignment, 
             @Param("excludedStatuses") List<DriverAssignmentStatus> excludedStatuses,
             @Param("tripStatuses") List<TripStatus> tripStatuses);
 
-    @EntityGraph(attributePaths = {"driver_user_id"})
+    @EntityGraph(attributePaths = {"driver_user_id", "vehicle_id", "assigned_by"})
     @Query("select assignment from TripAssignment assignment " +
             "where assignment.company_id.id = :companyId and assignment.trip_id.id = :tripId")
     Optional<TripAssignment> findByCompanyAndTrip(@Param("companyId") UUID companyId,

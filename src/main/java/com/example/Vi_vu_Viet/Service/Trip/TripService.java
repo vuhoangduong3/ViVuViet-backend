@@ -10,6 +10,7 @@ import com.example.Vi_vu_Viet.dto.Response.BaseResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripAssignmentResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripPassengerBookingResponse;
 import com.example.Vi_vu_Viet.dto.Response.Trip.TripResponse;
+import com.example.Vi_vu_Viet.dto.Response.Trip.TripDetailResponse;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -20,6 +21,14 @@ public interface TripService {
     BaseResponse<List<TripResponse>> getCompanyTrips(UUID companyId, LocalDate date, TripStatus status,
                                                      UUID routeId, String assignmentStatus);
 
+    BaseResponse<List<TripResponse>> getUpcomingTrips(UUID companyId);
+
+    BaseResponse<List<TripResponse>> getInProgressTrips(UUID companyId);
+
+    BaseResponse<List<TripResponse>> getCompletedTrips(UUID companyId);
+
+    BaseResponse<List<TripResponse>> getCancelledTrips(UUID companyId);
+
     BaseResponse<List<TripPassengerBookingResponse>> getTripBookings(UUID companyId, UUID tripId);
 
     BaseResponse<TripAssignmentResponse> getTripAssignment(UUID companyId, UUID tripId);
@@ -29,7 +38,7 @@ public interface TripService {
 
     BaseResponse<TripResponse> createTrip(UUID companyId, CreateTripRequest request, UserAccount actor);
 
-    BaseResponse<TripResponse> getCompanyTrip(UUID companyId, UUID tripId);
+    BaseResponse<TripDetailResponse> getCompanyTrip(UUID companyId, UUID tripId);
 
     BaseResponse<TripResponse> updateTrip(UUID companyId, UUID tripId, UpdateTripRequest request);
 

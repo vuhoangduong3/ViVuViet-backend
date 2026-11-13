@@ -9,7 +9,10 @@ import org.springframework.stereotype.Component;
 public class TripResponseMapper {
 
     public TripResponse toTripResponse(Trip trip) {
-        TripResponse response = new TripResponse();
+        return populateTripResponse(trip, new TripResponse());
+    }
+
+    public <T extends TripResponse> T populateTripResponse(Trip trip, T response) {
         response.setId(trip.getId());
         response.setCompanyId(trip.getCompany_id().getId());
         response.setCompanyName(trip.getCompany_id().getName());
