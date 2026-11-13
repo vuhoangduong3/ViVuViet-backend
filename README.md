@@ -121,6 +121,8 @@ Tài khoản đăng ký mới là khách hàng. Để thử API quản lý hãng
 
 Với mục 1.8, admin tạo khu vực và tuyến, cấu hình sơ đồ ghế cho xe, tạo chuyến nháp, phân xe và tài xế rồi mở bán chuyến. API tìm kiếm lọc theo khu vực đầu tuyến, khu vực cuối tuyến và ngày khởi hành. Khi đặt vé, khách chọn ghế và tự nhập địa chỉ đón/trả cho từng hành khách; giá vé được tính từ giá mặc định của tuyến.
 
+Các API danh sách, chi tiết, tạo và cập nhật tuyến tại `/api/v1/bus-companies/{company_id}/routes` trả thêm `tripCount` trong từng `RouteResponse`. Đây là tổng số chuyến đã tạo thuộc đúng hãng và tuyến, không lọc ngày và gồm mọi trạng thái (kể cả `DRAFT`). Tuyến mới hoặc chưa có chuyến trả `0`; tạm dừng tuyến vẫn giữ số đếm. Danh sách tuyến dùng một query aggregate để đếm cho toàn bộ tuyến, không truy vấn riêng từng tuyến.
+
 API đặt vé yêu cầu đăng nhập. Ghế được giữ trong 5 phút; khách cần xác nhận trước khi hết hạn. Thanh toán chưa được tích hợp.
 
 ### Luồng API đặt vé

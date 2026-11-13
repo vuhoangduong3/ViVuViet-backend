@@ -6,6 +6,8 @@ import com.example.Vi_vu_Viet.Entity.Trip.Route;
 import com.example.Vi_vu_Viet.Repository.Trip.AreaRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.BusCompanyRepository;
 import com.example.Vi_vu_Viet.Repository.Trip.RouteRepository;
+import com.example.Vi_vu_Viet.Repository.Trip.RouteTripCountProjection;
+import com.example.Vi_vu_Viet.Repository.Trip.TripRepository;
 import com.example.Vi_vu_Viet.Service.Trip.RouteService;
 import com.example.Vi_vu_Viet.Util.ApplicationCode;
 import com.example.Vi_vu_Viet.Util.Enums.BusCompanyStatus;
@@ -24,7 +26,9 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -34,16 +38,26 @@ public class RouteServiceImpl implements RouteService {
     BusCompanyRepository busCompanyRepository;
     AreaRepository areaRepository;
     RouteRepository routeRepository;
+    TripRepository tripRepository;
 
     @Override
     @Transactional(readOnly = true)
     public BaseResponse<List<RouteResponse>> getRoutes(UUID companyId) {
         getActiveCompany(companyId);
-        List<RouteResponse> routes = routeRepository.findAllByCompanyId(companyId).stream()
-                .map(this::toResponse)
+        List<Route> routes = routeRepository.findAllByCompanyId(companyId);
+        Map<UUID, Long> tripCounts = routes.isEmpty()
+                ? Map.of()
+                : tripRepository.countTripsByRouteIds(
+                        companyId, routes.stream().map(Route::getId).toList())
+                .stream()
+                .collect(Collectors.toMap(
+                        RouteTripCountProjection::getRouteId,
+                        RouteTripCountProjection::getTripCount));
+        List<RouteResponse> responses = routes.stream()
+                .map(route -> toResponse(route, tripCounts.getOrDefault(route.getId(), 0L)))
                 .toList();
         BaseResponse<List<RouteResponse>> response = new BaseResponse<>(ApplicationCode.SUCCESS);
-        response.setWsResponse(routes);
+        response.setWsResponse(responses);
         return response;
     }
 
@@ -70,14 +84,15 @@ public class RouteServiceImpl implements RouteService {
         route.setDuration_minutes(request.getDurationMinutes());
         route.setBase_fare_amount(request.getBaseFareAmount());
         route.setStatus(RouteStatus.ACTIVE);
-        return success(toResponse(routeRepository.save(route)));
+        return success(toResponse(routeRepository.save(route), 0L));
     }
 
     @Override
     @Transactional(readOnly = true)
     public BaseResponse<RouteResponse> getRoute(UUID companyId, UUID routeId) {
         getActiveCompany(companyId);
-        return success(toResponse(getCompanyRoute(companyId, routeId)));
+        Route route = getCompanyRoute(companyId, routeId);
+        return success(toResponse(route, tripRepository.countByCompanyIdAndRouteId(companyId, routeId)));
     }
 
     @Override
@@ -115,7 +130,8 @@ public class RouteServiceImpl implements RouteService {
         if (request.getBaseFareAmount() != null) route.setBase_fare_amount(request.getBaseFareAmount());
         if (request.getStatus() != null) route.setStatus(request.getStatus());
 
-        return success(toResponse(routeRepository.save(route)));
+        Route saved = routeRepository.save(route);
+        return success(toResponse(saved, tripRepository.countByCompanyIdAndRouteId(companyId, routeId)));
     }
 
     private BusCompany getActiveCompany(UUID companyId) {
@@ -153,7 +169,7 @@ public class RouteServiceImpl implements RouteService {
         return code.trim().toUpperCase();
     }
 
-    private RouteResponse toResponse(Route route) {
+    private RouteResponse toResponse(Route route, long tripCount) {
         RouteResponse response = new RouteResponse();
         response.setId(route.getId());
         response.setCompanyId(route.getCompany_id().getId());
@@ -168,6 +184,7 @@ public class RouteServiceImpl implements RouteService {
         response.setDistanceKm(route.getDistance_km());
         response.setDurationMinutes(route.getDuration_minutes());
         response.setBaseFareAmount(route.getBase_fare_amount());
+        response.setTripCount(tripCount);
         response.setStatus(route.getStatus());
         response.setCreatedAt(route.getCreated_at());
         response.setUpdatedAt(route.getUpdated_at());

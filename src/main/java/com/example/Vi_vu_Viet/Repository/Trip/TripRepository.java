@@ -12,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -27,6 +28,22 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
             "where trip.company_id.id = :companyId " +
             "order by trip.departure_at desc, trip.id")
     List<Trip> findAllByCompanyId(@Param("companyId") UUID companyId);
+
+    @Query("select trip.route_id.id as routeId, count(trip) as tripCount " +
+            "from Trip trip " +
+            "where trip.company_id.id = :companyId and trip.route_id.id in :routeIds " +
+            "group by trip.route_id.id")
+    List<RouteTripCountProjection> countTripsByRouteIds(
+            @Param("companyId") UUID companyId,
+            @Param("routeIds") Collection<UUID> routeIds
+    );
+
+    @Query("select count(trip) from Trip trip " +
+            "where trip.company_id.id = :companyId and trip.route_id.id = :routeId")
+    long countByCompanyIdAndRouteId(
+            @Param("companyId") UUID companyId,
+            @Param("routeId") UUID routeId
+    );
 
     @Query("select trip from Trip trip " +
             "join fetch trip.company_id company " +

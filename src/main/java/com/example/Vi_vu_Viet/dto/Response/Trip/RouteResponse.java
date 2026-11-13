@@ -41,6 +41,9 @@ public class RouteResponse {
 
     Long baseFareAmount;
 
+    @Schema(description = "Tổng số chuyến đã tạo cho tuyến, gồm mọi trạng thái")
+    Long tripCount;
+
     RouteStatus status;
 
     LocalDateTime createdAt;

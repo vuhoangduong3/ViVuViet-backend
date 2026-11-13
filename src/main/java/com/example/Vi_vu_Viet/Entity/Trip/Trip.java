@@ -32,7 +32,8 @@ import java.time.LocalDateTime;
         ),
         indexes = {
                 @Index(name = "ix_trips_company_departure", columnList = "company_id, departure_at"),
-                @Index(name = "ix_trips_company_sales_departure", columnList = "company_id, sales_status, departure_at")
+                @Index(name = "ix_trips_company_sales_departure", columnList = "company_id, sales_status, departure_at"),
+                @Index(name = "ix_trips_company_route", columnList = "company_id, route_id")
         }
 )
 @FieldDefaults(level = AccessLevel.PRIVATE)
