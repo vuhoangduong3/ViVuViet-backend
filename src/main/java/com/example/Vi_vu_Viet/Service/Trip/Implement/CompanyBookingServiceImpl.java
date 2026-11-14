@@ -30,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.JpaSort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -104,8 +105,8 @@ public class CompanyBookingServiceImpl implements CompanyBookingService {
         LocalDateTime now = LocalDateTime.now();
         var bookings = bookingRepository.findAll(
                 CompanyBookingSpecifications.matching(companyId, filter, now, true),
-                PageRequest.of(filter.getPage(), filter.getSize(), Sort.by(
-                        Sort.Order.desc("created_at"), Sort.Order.desc("id"))));
+                PageRequest.of(filter.getPage(), filter.getSize(),
+                        JpaSort.unsafe(Sort.Direction.DESC, "created_at", "id")));
         List<UUID> bookingIds = bookings.getContent().stream().map(Booking::getId).toList();
         Map<UUID, List<Ticket>> ticketsByBooking = bookingIds.isEmpty() ? Map.of()
                 : ticketRepository.findAllByBookingIds(bookingIds).stream()

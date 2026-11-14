@@ -112,6 +112,28 @@ class DashboardApiTests {
     }
 
     @Test
+    void companyBookingsArePaginatedNewestFirst() throws Exception {
+        entityManager.createNativeQuery("update bookings set created_at = :createdAt where booking_code = :code")
+                .setParameter("createdAt", LocalDateTime.of(2026, 1, 1, 8, 0))
+                .setParameter("code", "BK-DASH-ONE").executeUpdate();
+        entityManager.createNativeQuery("update bookings set created_at = :createdAt where booking_code = :code")
+                .setParameter("createdAt", LocalDateTime.of(2026, 1, 2, 8, 0))
+                .setParameter("code", "BK-DASH-TWO").executeUpdate();
+        entityManager.clear();
+
+        String[] expectedCodes = {"BK-DASH-TWO", "BK-DASH-ONE"};
+        for (int page = 0; page < expectedCodes.length; page++) {
+            mvc.perform(get(companyPath("/bookings")).header("Authorization", authorization)
+                            .param("page", Integer.toString(page)).param("size", "1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.wsResponse.content.length()").value(1))
+                    .andExpect(jsonPath("$.wsResponse.content[0].bookingCode").value(expectedCodes[page]))
+                    .andExpect(jsonPath("$.wsResponse.totalElements").value(2))
+                    .andExpect(jsonPath("$.wsResponse.totalPages").value(2));
+        }
+    }
+
+    @Test
     void dashboardAndRevenueEndpointsWorkWithAndWithoutDateFilters() throws Exception {
         mvc.perform(get(summaryPath()).header("Authorization", authorization).accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
