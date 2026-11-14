@@ -127,8 +127,8 @@ API đặt vé yêu cầu đăng nhập. Ghế được giữ trong 5 phút; kh�
 
 API tạo chuyến `POST /api/v1/bus-companies/{company_id}/trips` nhận thêm
 `driverWage` trong `wsRequest`: tiền công tài xế của chuyến, số nguyên VND không âm,
-ví dụ `"driverWage": 400000`. Trường này tùy chọn; bỏ qua hoặc gửi `null` nghĩa là
-chưa nhập, còn `0` là mức công bằng 0. Response tạo chuyến trả thêm `driverWage`.
+ví dụ `"driverWage": 400000`. Trường này tùy chọn; bỏ qua hoặc gửi `null` sẽ
+được lưu là `0`. Response tạo chuyến trả thêm `driverWage`.
 Tiền công được lưu trên `trips.driver_wage`; các chuyến cũ giữ `null`. Cấu hình
 `spring.jpa.hibernate.ddl-auto=update` hiện tại sẽ bổ sung cột khi ứng dụng khởi động.
 

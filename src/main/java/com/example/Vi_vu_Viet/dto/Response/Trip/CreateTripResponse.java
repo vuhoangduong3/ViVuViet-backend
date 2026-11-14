@@ -10,6 +10,6 @@ import lombok.experimental.FieldDefaults;
 @EqualsAndHashCode(callSuper = true)
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class CreateTripResponse extends TripResponse {
-    @Schema(description = "Tiền công tài xế theo chuyến, đơn vị VND; null nếu chưa nhập")
+    @Schema(description = "Tiền công tài xế theo chuyến, đơn vị VND; mặc định 0 nếu không nhập")
     Long driverWage;
 }

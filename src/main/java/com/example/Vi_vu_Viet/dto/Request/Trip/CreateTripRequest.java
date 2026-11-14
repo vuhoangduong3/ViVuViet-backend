@@ -38,6 +38,6 @@ public class CreateTripRequest {
     LocalDateTime bookingCutoffAt;
 
     @PositiveOrZero(message = "Tiền công tài xế không được âm")
-    @Schema(description = "Tiền công tài xế theo chuyến, đơn vị VND; null nếu chưa nhập", example = "400000")
+    @Schema(description = "Tiền công tài xế theo chuyến, đơn vị VND; mặc định 0 nếu không nhập hoặc gửi null", example = "400000")
     Long driverWage;
 }

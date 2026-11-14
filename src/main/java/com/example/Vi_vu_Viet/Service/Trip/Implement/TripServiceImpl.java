@@ -253,7 +253,7 @@ public class TripServiceImpl implements TripService {
         trip.setDeparture_at(request.getDepartureAt());
         trip.setExpected_arrival_at(request.getExpectedArrivalAt());
         trip.setBooking_cutoff_at(bookingCutoffAt);
-        trip.setDriver_wage(request.getDriverWage());
+        trip.setDriver_wage(request.getDriverWage() == null ? 0L : request.getDriverWage());
         trip.setStatus(TripStatus.DRAFT);
         trip.setSales_status(TripSalesStatus.CLOSED);
         trip.setCreated_by(actor == null ? null : userRepository.findById(actor.getId())
