@@ -8,6 +8,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -18,9 +20,11 @@ import java.util.Optional;
 import java.util.UUID;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.ArrayList;
+import jakarta.persistence.criteria.Predicate;
 
 @Repository
-public interface TripAssignmentRepository extends JpaRepository<TripAssignment, UUID> {
+public interface TripAssignmentRepository extends JpaRepository<TripAssignment, UUID>, JpaSpecificationExecutor<TripAssignment> {
 
     @Modifying
     @Query("delete from TripAssignment assignment where assignment.company_id.id = :companyId " +
@@ -60,18 +64,22 @@ public interface TripAssignmentRepository extends JpaRepository<TripAssignment, 
 
     @EntityGraph(attributePaths = {"company_id", "trip_id", "trip_id.route_id",
             "trip_id.route_id.origin_area_id", "trip_id.route_id.destination_area_id", "vehicle_id"})
-    @Query("select assignment from TripAssignment assignment " +
-            "where assignment.driver_user_id.id = :driverId " +
-            "and assignment.assignment_status not in :excludedStatuses " +
-            "and (:fromAt is null or assignment.trip_id.departure_at >= :fromAt) " +
-            "and (:toAt is null or assignment.trip_id.departure_at < :toAt) " +
-            "and (:tripStatus is null or assignment.trip_id.status = :tripStatus) " +
-            "order by assignment.trip_id.departure_at, assignment.id")
-    List<TripAssignment> findDriverTrips(@Param("driverId") UUID driverId,
-                                         @Param("fromAt") LocalDateTime fromAt,
-                                         @Param("toAt") LocalDateTime toAt,
-                                         @Param("tripStatus") TripStatus tripStatus,
-                                         @Param("excludedStatuses") List<DriverAssignmentStatus> excludedStatuses);
+    List<TripAssignment> findAll(Specification<TripAssignment> specification);
+
+    default List<TripAssignment> findDriverTrips(UUID driverId, LocalDateTime fromAt, LocalDateTime toAt,
+                                                  TripStatus tripStatus, List<DriverAssignmentStatus> excludedStatuses) {
+        return findAll((assignment, query, cb) -> {
+            var trip = assignment.get("trip_id");
+            List<Predicate> conditions = new ArrayList<>();
+            conditions.add(cb.equal(assignment.get("driver_user_id").get("id"), driverId));
+            conditions.add(cb.not(assignment.get("assignment_status").in(excludedStatuses)));
+            if (fromAt != null) conditions.add(cb.greaterThanOrEqualTo(trip.get("departure_at"), fromAt));
+            if (toAt != null) conditions.add(cb.lessThan(trip.get("departure_at"), toAt));
+            if (tripStatus != null) conditions.add(cb.equal(trip.get("status"), tripStatus));
+            query.orderBy(cb.asc(trip.get("departure_at")), cb.asc(assignment.get("id")));
+            return cb.and(conditions.toArray(Predicate[]::new));
+        });
+    }
 
     @EntityGraph(attributePaths = {"company_id", "trip_id", "trip_id.route_id",
             "trip_id.route_id.origin_area_id", "trip_id.route_id.destination_area_id", "vehicle_id"})
